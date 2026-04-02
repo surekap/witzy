@@ -1,39 +1,522 @@
 @import "tailwindcss";
 
+/* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --page-deep: #020617;
-  --page-mid: #0f172a;
-  --page-glow: rgba(34, 211, 238, 0.22);
-  --page-pop: rgba(249, 115, 22, 0.28);
+  --canvas:       oklch(95.5% 0.022 84);   /* warm cream background */
+  --card:         oklch(99%   0.008 84);   /* off-white card surface */
+  --ink:          oklch(16%   0.028 65);   /* warm near-black */
+  --ink-muted:    oklch(50%   0.020 72);   /* secondary text */
+  --ink-faint:    oklch(82%   0.015 80);   /* borders, dividers */
+
+  --coral:        oklch(57%   0.225 27);   /* primary CTA */
+  --coral-hover:  oklch(53%   0.225 27);
+  --coral-light:  oklch(93.5% 0.050 27);   /* tinted bg */
+
+  --warm:         oklch(80%   0.148 84);   /* golden amber */
+  --warm-deep:    oklch(55%   0.170 76);   /* amber text / key badge */
+
+  --forest:       oklch(52%   0.152 140);  /* success green */
+  --forest-light: oklch(92.5% 0.058 140);
+
+  --berry:        oklch(58%   0.210 14);   /* error / danger */
+  --berry-light:  oklch(94%   0.052 14);
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* ── Base ──────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
 
 body {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, var(--page-glow), transparent 32%),
-    radial-gradient(circle at top right, var(--page-pop), transparent 26%),
-    linear-gradient(160deg, var(--page-deep), var(--page-mid) 48%, #111827);
-  color: #e2e8f0;
-  font-family:
-    ui-rounded,
-    "Trebuchet MS",
-    "Avenir Next",
-    "Segoe UI",
-    sans-serif;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body, "DM Sans", "Segoe UI", sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: rgba(34, 211, 238, 0.28);
-  color: white;
+  background-color: color-mix(in oklch, var(--warm) 40%, transparent);
+  color: var(--ink);
 }
 
-.app-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
-  background-size: 36px 36px;
+/* ── Headings use display font ─────────────────────────────── */
+h1, h2, h3, h4 {
+  font-family: var(--font-display, "Bricolage Grotesque", "Trebuchet MS", sans-serif);
+}
+
+/* ── Sticker-style button ──────────────────────────────────── */
+/*
+   The signature element of this design: thick ink border + 3-unit
+   offset shadow that compresses on press, giving a physical "stamp" feel.
+*/
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8125rem 1.5rem;
+  border-radius: 9999px;
+  font-family: var(--font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 2.5px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.btn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--coral);
+  color: var(--card);
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--coral-hover);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--ink);
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--ink) 5%, transparent);
+}
+
+/* Small button variant */
+.btn-sm {
+  padding: 0.5625rem 1rem;
+  font-size: 0.8125rem;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.btn-sm:hover:not(:disabled) {
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.btn-sm:active:not(:disabled) {
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* ── Card surface ──────────────────────────────────────────── */
+.surface {
+  background-color: var(--card);
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 8px color-mix(in oklch, var(--ink) 5%, transparent);
+}
+
+/* ── Stat pill ─────────────────────────────────────────────── */
+.stat-pill {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1.5px solid;
+  min-width: 80px;
+  text-align: center;
+}
+.stat-pill-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.stat-pill-value {
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.stat-pill-coral {
+  border-color: color-mix(in oklch, var(--coral) 35%, transparent);
+  background-color: var(--coral-light);
+  color: var(--coral);
+}
+.stat-pill-amber {
+  border-color: color-mix(in oklch, var(--warm-deep) 30%, transparent);
+  background-color: color-mix(in oklch, var(--warm) 22%, var(--card));
+  color: var(--warm-deep);
+}
+.stat-pill-forest {
+  border-color: color-mix(in oklch, var(--forest) 35%, transparent);
+  background-color: var(--forest-light);
+  color: var(--forest);
+}
+
+/* ── Answer option tiles ───────────────────────────────────── */
+/*
+   Large touch targets for phone play. The key letter badge sits
+   to the left; the answer text flows to the right. A slight lift
+   on hover, a warm golden fill when selected.
+*/
+.answer-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  text-align: left;
+  padding: 1.125rem 1.25rem;
+  border-radius: 14px;
+  border: 2px solid var(--ink-faint);
+  background-color: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body, sans-serif);
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: transform 100ms ease-out, box-shadow 100ms ease-out,
+              background-color 120ms, border-color 120ms;
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--ink) 10%, transparent);
+}
+.answer-tile:hover:not(:disabled):not(.selected) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 color-mix(in oklch, var(--ink) 12%, transparent);
+  border-color: color-mix(in oklch, var(--ink) 28%, transparent);
+}
+.answer-tile.selected {
+  background-color: var(--warm);
+  border-color: var(--ink);
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--ink) 35%, transparent);
+}
+.answer-tile:disabled { cursor: default; }
+
+.answer-tile-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 8px;
+  background-color: color-mix(in oklch, var(--ink) 8%, transparent);
+  color: var(--ink-muted);
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.answer-tile.selected .answer-tile-key {
+  background-color: color-mix(in oklch, var(--warm-deep) 20%, transparent);
+  color: var(--warm-deep);
+}
+
+/* ── Form inputs ───────────────────────────────────────────── */
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 2px solid var(--ink-faint);
+  background-color: var(--card);
+  color: var(--ink);
+  font-family: var(--font-body, sans-serif);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  transition: border-color 150ms, box-shadow 150ms;
+  -webkit-appearance: none;
+}
+.form-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.7;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--coral);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--coral) 15%, transparent);
+}
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 2.75rem;
+  cursor: pointer;
+}
+
+/* ── Label / field wrapper ─────────────────────────────────── */
+.field-label {
+  display: block;
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin-top: 0.25rem;
+}
+
+/* ── Category toggle pill ──────────────────────────────────── */
+.cat-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 2px solid var(--ink-faint);
+  background-color: var(--card);
+  cursor: pointer;
+  transition: border-color 120ms, background-color 120ms;
+  font-family: var(--font-body, sans-serif);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  user-select: none;
+}
+.cat-pill:hover {
+  border-color: color-mix(in oklch, var(--ink) 25%, transparent);
+}
+.cat-pill.active {
+  border-color: var(--coral);
+  background-color: var(--coral-light);
+}
+.cat-pill-badge {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.cat-pill.active .cat-pill-badge {
+  color: var(--coral);
+}
+
+/* ── Feature toggle row ────────────────────────────────────── */
+.feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.125rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--ink-faint);
+  background-color: var(--card);
+}
+.feature-row-label {
+  font-family: var(--font-body, sans-serif);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+/* ── Timer display ─────────────────────────────────────────── */
+.timer-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 0.5rem 1.125rem;
+  border-radius: 9999px;
+  border: 2px solid var(--ink);
+  font-family: var(--font-display, sans-serif);
+  font-weight: 800;
+  font-size: 1.375rem;
+  line-height: 1;
+  transition: background-color 300ms, color 300ms;
+}
+.timer-pill.ok {
+  background-color: color-mix(in oklch, var(--warm) 22%, var(--card));
+  color: var(--ink);
+}
+.timer-pill.warn {
+  background-color: var(--coral-light);
+  color: var(--coral);
+}
+.timer-pill.urgent {
+  background-color: var(--coral);
+  color: var(--card);
+  animation: pulse-timer 0.6s ease-in-out infinite alternate;
+}
+@keyframes pulse-timer {
+  from { transform: scale(1); }
+  to   { transform: scale(1.04); }
+}
+
+/* ── Player avatar + rank badge ────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-family: var(--font-display, sans-serif);
+  font-weight: 800;
+  border: 2px solid var(--ink);
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.avatar-sm { width: 36px; height: 36px; font-size: 0.8125rem; }
+.avatar-md { width: 44px; height: 44px; font-size: 0.9375rem; }
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background-color: color-mix(in oklch, var(--ink) 8%, transparent);
+  color: var(--ink-muted);
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.rank-badge.gold {
+  background-color: var(--warm);
+  color: var(--warm-deep);
+}
+.rank-badge.silver {
+  background-color: color-mix(in oklch, var(--ink) 12%, transparent);
+  color: var(--ink);
+}
+
+/* ── Avatar color swatches ─────────────────────────────────── */
+.avatar-amber  { background-color: oklch(80% 0.148 84); }
+.avatar-coral  { background-color: oklch(70% 0.18  27); }
+.avatar-lime   { background-color: oklch(78% 0.18  130); }
+.avatar-violet { background-color: oklch(68% 0.18  300); }
+.avatar-sky    { background-color: oklch(72% 0.16  240); }
+.avatar-cyan   { background-color: oklch(74% 0.16  200); }
+.avatar-rose   { background-color: oklch(72% 0.18  12); }
+
+/* ── Section heading rhythm ────────────────────────────────── */
+.section-eyebrow {
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.section-title {
+  font-family: var(--font-display, sans-serif);
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+/* ── Inline alert ──────────────────────────────────────────── */
+.alert-error {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid color-mix(in oklch, var(--berry) 35%, transparent);
+  background-color: var(--berry-light);
+  color: var(--berry);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* ── Connection status badges ──────────────────────────────── */
+.badge-online  {
+  display: inline-flex;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: var(--forest-light);
+  color: var(--forest);
+  border: 1px solid color-mix(in oklch, var(--forest) 30%, transparent);
+}
+.badge-offline {
+  display: inline-flex;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: color-mix(in oklch, var(--ink) 7%, transparent);
+  color: var(--ink-muted);
+  border: 1px solid var(--ink-faint);
+}
+
+/* ── Leaderboard row ───────────────────────────────────────── */
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--ink-faint);
+  background-color: var(--card);
+  transition: border-color 150ms;
+}
+.lb-row.viewer {
+  border-color: color-mix(in oklch, var(--coral) 40%, transparent);
+  background-color: var(--coral-light);
+}
+
+/* ── Result reveal card ────────────────────────────────────── */
+.result-card {
+  padding: 1.125rem 1.25rem;
+  border-radius: 16px;
+  border: 1.5px solid var(--ink-faint);
+  background-color: var(--card);
+}
+.result-card.correct {
+  border-color: color-mix(in oklch, var(--forest) 40%, transparent);
+  background-color: var(--forest-light);
+}
+.result-card.incorrect {
+  border-color: color-mix(in oklch, var(--berry) 35%, transparent);
+  background-color: var(--berry-light);
+}
+
+/* ── Pathway card (landing) ────────────────────────────────── */
+.pathway-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--ink-faint);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+  box-shadow: 0 1px 6px color-mix(in oklch, var(--ink) 5%, transparent);
+  min-height: 190px;
+}
+.pathway-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 22px color-mix(in oklch, var(--ink) 9%, transparent);
+}
+.pathway-card-coral  { background-color: var(--coral-light); }
+.pathway-card-forest { background-color: var(--forest-light); }
+.pathway-card-warm   { background-color: color-mix(in oklch, var(--warm) 18%, var(--card)); }
+
+/* ── Feature callout strip ─────────────────────────────────── */
+.feature-callout {
+  padding: 1rem 1.125rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--ink-faint);
+  background-color: var(--card);
+  border-top: 3px solid var(--coral);
+}
+
+/* ── Spectator notice ──────────────────────────────────────── */
+.spectator-notice {
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--ink-faint);
+  background-color: color-mix(in oklch, var(--ink) 4%, transparent);
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
 }

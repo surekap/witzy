@@ -1,18 +1,21 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 
-import { primaryButtonClass, secondaryButtonClass, Surface } from "@/components/ui";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 
-const avatarColors = ["amber", "cyan", "rose", "lime", "violet", "sky"];
+const avatarColors = ["amber", "coral", "lime", "violet", "sky", "cyan", "rose"] as const;
+type AvatarColor = (typeof avatarColors)[number];
+
 type JoinRoomState = {
   roomCode: string;
   displayName: string;
   ageBand: "6_to_8" | "9_to_11" | "12_to_14" | "15_plus";
   difficultyMode: "easy" | "medium" | "hard" | "adaptive";
-  avatarColor: string;
+  avatarColor: AvatarColor;
 };
 
 export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
@@ -33,9 +36,7 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
 
     const response = await fetch(`/api/rooms/${formState.roomCode.toUpperCase()}/join`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         displayName: formState.displayName,
         ageBand: formState.ageBand,
@@ -44,7 +45,6 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
       }),
     });
     const payload = await response.json();
-
     setIsSubmitting(false);
 
     if (!response.ok) {
@@ -56,118 +56,171 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
   };
 
   return (
-    <Surface className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.28em] text-cyan-200/80">Join Room</p>
-        <h2 className="text-3xl font-black text-white">Hop into the next quiz round</h2>
-        <p className="max-w-2xl text-sm text-slate-300">
-          Join from any phone or tablet, choose the age band that fits, and the game will tune the questions to your
-          challenge level.
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Room code</span>
-          <input
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white uppercase placeholder:text-slate-500 focus:border-cyan-300/60"
-            value={formState.roomCode}
-            onChange={(event) =>
-              setFormState((current) => ({ ...current, roomCode: event.target.value.toUpperCase() }))
-            }
-          />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Display name</span>
-          <input
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white placeholder:text-slate-500 focus:border-cyan-300/60"
-            value={formState.displayName}
-            onChange={(event) => setFormState((current) => ({ ...current, displayName: event.target.value }))}
-          />
-        </label>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Age band</span>
-          <select
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
-            value={formState.ageBand}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                ageBand: event.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus",
-              }))
-            }
+    <div className="space-y-8">
+      {/* ── Page header ── */}
+      <header className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
+        </Link>
+        <div>
+          <p className="section-eyebrow">Join a room</p>
+          <h1
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.02em",
+              color: "var(--ink)",
+            }}
           >
-            <option value="6_to_8">6 to 8</option>
-            <option value="9_to_11">9 to 11</option>
-            <option value="12_to_14">12 to 14</option>
-            <option value="15_plus">15 plus</option>
-          </select>
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Difficulty</span>
-          <select
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
-            value={formState.difficultyMode}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                difficultyMode: event.target.value as "easy" | "medium" | "hard" | "adaptive",
-              }))
-            }
-          >
-            <option value="adaptive">Adaptive</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </label>
-        <div className="space-y-2">
-          <span className="text-sm font-semibold text-white">Avatar color</span>
-          <div className="flex flex-wrap gap-2">
-            {avatarColors.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setFormState((current) => ({ ...current, avatarColor: color }))}
-                className={`h-11 w-11 rounded-full border-2 transition ${
-                  formState.avatarColor === color ? "border-white scale-110" : "border-transparent"
-                } ${
-                  color === "amber"
-                    ? "bg-amber-400"
-                    : color === "cyan"
-                      ? "bg-cyan-400"
-                      : color === "rose"
-                        ? "bg-rose-400"
-                        : color === "lime"
-                          ? "bg-lime-400"
-                          : color === "violet"
-                            ? "bg-violet-400"
-                            : "bg-sky-400"
-                }`}
-              />
-            ))}
+            Hop into the quiz
+          </h1>
+        </div>
+      </header>
+
+      <div className="surface space-y-7">
+        {/* ── Room code + name ── */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="field-label">Room code</span>
+            <input
+              className="form-input"
+              style={{ textTransform: "uppercase", letterSpacing: "0.12em", fontSize: "1.25rem", fontWeight: 700 }}
+              value={formState.roomCode}
+              onChange={(e) =>
+                setFormState((s) => ({ ...s, roomCode: e.target.value.toUpperCase() }))
+              }
+              placeholder="ABCD"
+              maxLength={8}
+            />
+          </label>
+          <label className="block">
+            <span className="field-label">Your name</span>
+            <input
+              className="form-input"
+              value={formState.displayName}
+              onChange={(e) => setFormState((s) => ({ ...s, displayName: e.target.value }))}
+              placeholder="Player"
+            />
+          </label>
+        </div>
+
+        {/* ── Age + difficulty ── */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="field-label">Age band</span>
+            <select
+              className="form-input mt-1"
+              value={formState.ageBand}
+              onChange={(e) =>
+                setFormState((s) => ({
+                  ...s,
+                  ageBand: e.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus",
+                }))
+              }
+            >
+              <option value="6_to_8">6 – 8 years</option>
+              <option value="9_to_11">9 – 11 years</option>
+              <option value="12_to_14">12 – 14 years</option>
+              <option value="15_plus">15 +</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="field-label">Difficulty</span>
+            <select
+              className="form-input mt-1"
+              value={formState.difficultyMode}
+              onChange={(e) =>
+                setFormState((s) => ({
+                  ...s,
+                  difficultyMode: e.target.value as "easy" | "medium" | "hard" | "adaptive",
+                }))
+              }
+            >
+              <option value="adaptive">Adaptive (recommended)</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+        </div>
+
+        {/* ── Avatar color ── */}
+        <div>
+          <p className="field-label">Avatar colour</p>
+          <div className="flex flex-wrap gap-3 mt-2">
+            {avatarColors.map((color) => {
+              const selected = formState.avatarColor === color;
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setFormState((s) => ({ ...s, avatarColor: color }))}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    border: selected ? "3px solid var(--ink)" : "2.5px solid transparent",
+                    boxShadow: selected ? "0 0 0 2px var(--card), 0 0 0 4px var(--ink)" : "none",
+                    outline: "none",
+                    cursor: "pointer",
+                    transform: selected ? "scale(1.15)" : "scale(1)",
+                    transition: "transform 120ms, box-shadow 120ms",
+                    flexShrink: 0,
+                  }}
+                  className={`avatar-${color}`}
+                  aria-label={`Avatar colour: ${color}`}
+                  aria-pressed={selected}
+                />
+              );
+            })}
+          </div>
+
+          {/* Preview */}
+          <div className="flex items-center gap-3 mt-4">
+            <div
+              className={`avatar avatar-md avatar-${formState.avatarColor}`}
+              aria-hidden="true"
+            >
+              {formState.displayName.charAt(0).toUpperCase() || "P"}
+            </div>
+            <div>
+              <p
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: "0.9375rem",
+                  color: "var(--ink)",
+                }}
+              >
+                {formState.displayName || "Player"}
+              </p>
+              <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                {formState.ageBand.replaceAll("_", " ")} · {formState.difficultyMode}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {error ? <p className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
+        {error ? <p className="alert-error">{error}</p> : null}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          className={primaryButtonClass}
-          disabled={isSubmitting}
-          onClick={() => startTransition(() => void submit())}
-          type="button"
-        >
-          {isSubmitting ? "Joining..." : "Join the game"}
-        </button>
-        <Link className={secondaryButtonClass} href="/">
-          Back home
-        </Link>
+        {/* ── Actions ── */}
+        <div className="flex flex-wrap gap-3 pt-2">
+          <button
+            className={primaryButtonClass}
+            disabled={isSubmitting || !formState.roomCode || !formState.displayName}
+            onClick={() => startTransition(() => void submit())}
+            type="button"
+          >
+            {isSubmitting ? "Joining…" : "Join the game"}
+          </button>
+          <Link className={secondaryButtonClass} href="/">
+            Back home
+          </Link>
+        </div>
       </div>
-    </Surface>
+    </div>
   );
 }

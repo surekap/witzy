@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 
-import { primaryButtonClass, secondaryButtonClass, Surface } from "@/components/ui";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 import type { Category } from "@/types/game";
 
 const rounds = [5, 10, 15] as const;
 const timeLimits = [10, 15, 20] as const;
+
 type HostCreateState = {
   hostName: string;
   numberOfRounds: 5 | 10 | 15;
@@ -20,11 +22,12 @@ type HostCreateState = {
   teamBonus: boolean;
   hints: boolean;
 };
+
 const toggleOptions = [
-  { key: "fastestCorrectBonus", label: "Fastest correct bonus" },
-  { key: "confidenceWager", label: "Confidence wager" },
-  { key: "teamBonus", label: "Team bonus" },
-  { key: "hints", label: "One hint per player" },
+  { key: "fastestCorrectBonus", label: "Fastest correct bonus", hint: "+1 for the quickest right answer" },
+  { key: "confidenceWager", label: "Confidence wager", hint: "Bold: +1 if right, −1 if wrong" },
+  { key: "teamBonus", label: "Team bonus", hint: "+1 for everyone if all are correct" },
+  { key: "hints", label: "One hint per player", hint: "50/50 option that caps max points" },
 ] as const;
 
 export function HostCreateForm({ categories }: { categories: Category[] }) {
@@ -36,24 +39,20 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
     numberOfRounds: 5,
     answerTimeLimitSeconds: 15,
     categoryMode: "host_selects_each_round",
-    enabledCategoryIds: categories.map((category) => category.id),
+    enabledCategoryIds: categories.map((c) => c.id),
     fastestCorrectBonus: true,
     confidenceWager: true,
     teamBonus: true,
     hints: true,
   });
 
-  const toggleCategory = (categoryId: string) => {
-    setFormState((current) => {
-      const enabledCategoryIds = current.enabledCategoryIds.includes(categoryId)
-        ? current.enabledCategoryIds.filter((entry) => entry !== categoryId)
-        : [...current.enabledCategoryIds, categoryId];
-
-      return {
-        ...current,
-        enabledCategoryIds,
-      };
-    });
+  const toggleCategory = (id: string) => {
+    setFormState((cur) => ({
+      ...cur,
+      enabledCategoryIds: cur.enabledCategoryIds.includes(id)
+        ? cur.enabledCategoryIds.filter((x) => x !== id)
+        : [...cur.enabledCategoryIds, id],
+    }));
   };
 
   const submit = async () => {
@@ -62,17 +61,14 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
 
     const response = await fetch("/api/rooms", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formState),
     });
     const payload = await response.json();
-
     setIsSubmitting(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "Couldn't create the room yet.");
+      setError(payload.error ?? "Couldn't create the room.");
       return;
     }
 
@@ -80,160 +76,168 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
   };
 
   return (
-    <Surface className="space-y-6">
-      <div className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.28em] text-cyan-200/80">Host Setup</p>
-        <h2 className="text-3xl font-black text-white">Create a live family quiz room</h2>
-        <p className="max-w-2xl text-sm text-slate-300">
-          Choose the round count, timer pressure, and optional bonuses. Players join from their own phones with the room
-          code.
-        </p>
-      </div>
-
-      <label className="block space-y-2">
-        <span className="text-sm font-semibold text-white">Host name</span>
-        <input
-          className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white outline-none ring-0 placeholder:text-slate-500 focus:border-cyan-300/60"
-          value={formState.hostName}
-          onChange={(event) => setFormState((current) => ({ ...current, hostName: event.target.value }))}
-          placeholder="Quizmaster"
-        />
-      </label>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Rounds</span>
-          <select
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
-            value={formState.numberOfRounds}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                numberOfRounds: Number(event.target.value) as 5 | 10 | 15,
-              }))
-            }
-          >
-            {rounds.map((round) => (
-              <option key={round} value={round}>
-                {round} rounds
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Answer timer</span>
-          <select
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
-            value={formState.answerTimeLimitSeconds}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                answerTimeLimitSeconds: Number(event.target.value) as 10 | 15 | 20,
-              }))
-            }
-          >
-            {timeLimits.map((limit) => (
-              <option key={limit} value={limit}>
-                {limit} seconds
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-white">Category mode</span>
-          <select
-            className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
-            value={formState.categoryMode}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                categoryMode: event.target.value as "host_selects_each_round" | "random_from_selected_pool",
-              }))
-            }
-          >
-            <option value="host_selects_each_round">Host selects each round</option>
-            <option value="random_from_selected_pool">Random from selected pool</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-semibold text-white">Enabled categories</p>
-          <p className="text-sm text-slate-400">Keep it broad for demo games, or trim the pool for themed rounds.</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category) => {
-            const checked = formState.enabledCategoryIds.includes(category.id);
-            return (
-              <label
-                key={category.id}
-                className={`flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-3 transition ${
-                  checked
-                    ? "border-orange-300/40 bg-orange-300/10 text-white"
-                    : "border-white/10 bg-white/5 text-slate-300"
-                }`}
-              >
-                <span className="font-medium">
-                  {category.icon} {category.name}
-                </span>
-                <input
-                  className="sr-only"
-                  checked={checked}
-                  type="checkbox"
-                  onChange={() => toggleCategory(category.id)}
-                />
-                <span className="text-xs uppercase tracking-[0.2em]">{checked ? "On" : "Off"}</span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {toggleOptions.map(({ key, label }) => (
-          <label
-            key={key}
-            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white"
-          >
-            <span className="font-medium">{label}</span>
-            <button
-              type="button"
-              className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${
-                formState[key]
-                  ? "bg-lime-300 text-slate-950"
-                  : "bg-slate-800 text-slate-300"
-              }`}
-              onClick={() =>
-                setFormState((current) => ({
-                  ...current,
-                  [key]: !current[key],
-                }))
-              }
-            >
-              {formState[key] ? "Enabled" : "Disabled"}
-            </button>
-          </label>
-        ))}
-      </div>
-
-      {error ? <p className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          className={primaryButtonClass}
-          disabled={isSubmitting || formState.enabledCategoryIds.length === 0}
-          onClick={() => startTransition(() => void submit())}
-          type="button"
-        >
-          {isSubmitting ? "Creating room..." : "Create room"}
-        </button>
-        <Link className={secondaryButtonClass} href="/">
-          Back home
+    <div className="space-y-8">
+      {/* ── Page header ── */}
+      <header className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
         </Link>
+        <div>
+          <p className="section-eyebrow">Host setup</p>
+          <h1
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.02em",
+              color: "var(--ink)",
+            }}
+          >
+            Create a live quiz room
+          </h1>
+        </div>
+      </header>
+
+      <div className="surface space-y-8">
+        {/* ── Host name ── */}
+        <label className="block">
+          <span className="field-label">Your name</span>
+          <input
+            className="form-input"
+            value={formState.hostName}
+            onChange={(e) => setFormState((s) => ({ ...s, hostName: e.target.value }))}
+            placeholder="Quizmaster"
+          />
+        </label>
+
+        {/* ── Round settings ── */}
+        <div>
+          <p className="field-label mb-3">Round settings</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className="field-label" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>Rounds</span>
+              <select
+                className="form-input mt-1"
+                value={formState.numberOfRounds}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, numberOfRounds: Number(e.target.value) as 5 | 10 | 15 }))
+                }
+              >
+                {rounds.map((r) => (
+                  <option key={r} value={r}>{r} rounds</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="field-label" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>Answer timer</span>
+              <select
+                className="form-input mt-1"
+                value={formState.answerTimeLimitSeconds}
+                onChange={(e) =>
+                  setFormState((s) => ({
+                    ...s,
+                    answerTimeLimitSeconds: Number(e.target.value) as 10 | 15 | 20,
+                  }))
+                }
+              >
+                {timeLimits.map((t) => (
+                  <option key={t} value={t}>{t} seconds</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="field-label" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>Category mode</span>
+              <select
+                className="form-input mt-1"
+                value={formState.categoryMode}
+                onChange={(e) =>
+                  setFormState((s) => ({
+                    ...s,
+                    categoryMode: e.target.value as "host_selects_each_round" | "random_from_selected_pool",
+                  }))
+                }
+              >
+                <option value="host_selects_each_round">Host picks each round</option>
+                <option value="random_from_selected_pool">Random from pool</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {/* ── Categories ── */}
+        <div>
+          <p className="field-label">Enabled categories</p>
+          <p className="field-hint mb-3">
+            {formState.enabledCategoryIds.length} of {categories.length} selected
+          </p>
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.map((cat) => {
+              const active = formState.enabledCategoryIds.includes(cat.id);
+              return (
+                <label
+                  key={cat.id}
+                  className={`cat-pill${active ? " active" : ""}`}
+                >
+                  <span>
+                    {cat.icon} {cat.name}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={active}
+                    onChange={() => toggleCategory(cat.id)}
+                  />
+                  <span className="cat-pill-badge">{active ? "On" : "Off"}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Optional mechanics ── */}
+        <div>
+          <p className="field-label mb-3">Optional mechanics</p>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {toggleOptions.map(({ key, label, hint }) => (
+              <div key={key} className="feature-row">
+                <div>
+                  <p className="feature-row-label">{label}</p>
+                  <p className="field-hint" style={{ marginTop: 0 }}>{hint}</p>
+                </div>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${formState[key] ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() =>
+                    setFormState((s) => ({ ...s, [key]: !s[key] }))
+                  }
+                >
+                  {formState[key] ? "On" : "Off"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {error ? <p className="alert-error">{error}</p> : null}
+
+        {/* ── Actions ── */}
+        <div className="flex flex-wrap gap-3 pt-2">
+          <button
+            className={primaryButtonClass}
+            disabled={isSubmitting || formState.enabledCategoryIds.length === 0}
+            onClick={() => startTransition(() => void submit())}
+            type="button"
+          >
+            {isSubmitting ? "Creating room…" : "Create room"}
+          </button>
+          <Link className={secondaryButtonClass} href="/">
+            Back home
+          </Link>
+        </div>
       </div>
-    </Surface>
+    </div>
   );
 }

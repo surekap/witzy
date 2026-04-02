@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { startTransition, useState } from "react";
 
-import { primaryButtonClass, secondaryButtonClass, Surface } from "@/components/ui";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 import type { AnswerKey, Category, Question } from "@/types/game";
 
 interface SoloQuestionPayload {
@@ -14,7 +15,7 @@ interface SoloQuestionPayload {
 export function SoloPractice({ categories }: { categories: Category[] }) {
   const [ageBand, setAgeBand] = useState<"6_to_8" | "9_to_11" | "12_to_14" | "15_plus">("9_to_11");
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
-  const [askedQuestionIds, setAskedQuestionIds] = useState<string[]>([]);
+  const [askedIds, setAskedIds] = useState<string[]>([]);
   const [current, setCurrent] = useState<SoloQuestionPayload | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<AnswerKey | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -25,149 +26,277 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
     setError(null);
     const response = await fetch("/api/solo/next", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         categoryId,
         ageBand,
-        askedQuestionIds,
+        askedQuestionIds: askedIds,
         difficultyMode: "adaptive",
       }),
     });
     const payload = await response.json();
-
     if (!response.ok) {
-      setError(payload.error ?? "Couldn't load the next solo question.");
+      setError(payload.error ?? "Couldn't load the next question.");
       return;
     }
-
     setCurrent(payload);
     setSelectedAnswer(null);
     setSubmitted(false);
-    setAskedQuestionIds((currentIds) => [...currentIds, payload.question.id]);
+    setAskedIds((ids) => [...ids, payload.question.id]);
   };
 
   const submitAnswer = () => {
-    if (!current || !selectedAnswer) {
-      return;
-    }
-
+    if (!current || !selectedAnswer) return;
     setSubmitted(true);
     if (selectedAnswer === current.question.correctAnswer) {
-      setCorrectCount((count) => count + 1);
+      setCorrectCount((n) => n + 1);
     }
   };
 
-  const isComplete = askedQuestionIds.length >= 10 && submitted;
+  const questionNumber = Math.min(askedIds.length, 10);
+  const isComplete = askedIds.length >= 10 && submitted;
+  const isCorrect = submitted && selectedAnswer === current?.question.correctAnswer;
 
   return (
-    <div className="space-y-6">
-      <Surface className="space-y-4">
+    <div className="space-y-8">
+      {/* ── Page header ── */}
+      <header className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
+        </Link>
+        <div>
+          <p className="section-eyebrow">Solo practice</p>
+          <h1
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.02em",
+              color: "var(--ink)",
+            }}
+          >
+            Test the question engine
+          </h1>
+        </div>
+      </header>
+
+      {/* ── Settings + score ── */}
+      <div className="surface space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-200/80">Solo Practice</p>
-            <h2 className="text-3xl font-black text-white">Test the question engine in single-player mode</h2>
+            <p className="section-eyebrow">Settings</p>
+            <h2 className="section-title" style={{ fontSize: "1.1875rem" }}>
+              10-question adaptive session
+            </h2>
           </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white">
-            Score: {correctCount} / {Math.min(askedQuestionIds.length, 10)}
-          </div>
+          {askedIds.length > 0 ? (
+            <div
+              style={{
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "0.5rem 1.25rem",
+                borderRadius: 9999,
+                border: "2px solid var(--ink)",
+                backgroundColor:
+                  correctCount > askedIds.length / 2
+                    ? "var(--forest-light)"
+                    : "var(--card)",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 800,
+                  fontSize: "1.5rem",
+                  lineHeight: 1,
+                  color: correctCount > askedIds.length / 2 ? "var(--forest)" : "var(--ink)",
+                }}
+              >
+                {correctCount} / {questionNumber}
+              </span>
+              <span style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+                correct
+              </span>
+            </div>
+          ) : null}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-2">
-            <span className="text-sm font-semibold text-white">Category</span>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block">
+            <span className="field-label" style={{ fontSize: "0.8125rem" }}>Category</span>
             <select
-              className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
+              className="form-input mt-1"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
+              onChange={(e) => setCategoryId(e.target.value)}
             >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
                 </option>
               ))}
             </select>
           </label>
-          <label className="space-y-2">
-            <span className="text-sm font-semibold text-white">Age band</span>
+
+          <label className="block">
+            <span className="field-label" style={{ fontSize: "0.8125rem" }}>Age band</span>
             <select
-              className="w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-white"
+              className="form-input mt-1"
               value={ageBand}
-              onChange={(event) =>
-                setAgeBand(event.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus")
+              onChange={(e) =>
+                setAgeBand(e.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus")
               }
             >
-              <option value="6_to_8">6 to 8</option>
-              <option value="9_to_11">9 to 11</option>
-              <option value="12_to_14">12 to 14</option>
-              <option value="15_plus">15 plus</option>
+              <option value="6_to_8">6 – 8 years</option>
+              <option value="9_to_11">9 – 11 years</option>
+              <option value="12_to_14">12 – 14 years</option>
+              <option value="15_plus">15 +</option>
             </select>
           </label>
+
           <div className="flex items-end">
             <button
               className={primaryButtonClass}
-              disabled={askedQuestionIds.length >= 10 && submitted}
+              disabled={isComplete}
               onClick={() => startTransition(() => void fetchQuestion())}
               type="button"
+              style={{ width: "100%" }}
             >
-              {current ? (askedQuestionIds.length >= 10 && submitted ? "Practice complete" : "Load another") : "Start practice"}
+              {isComplete
+                ? "Practice complete"
+                : current
+                  ? "Next question →"
+                  : "Start practice"}
             </button>
           </div>
         </div>
 
-        {error ? <p className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
-      </Surface>
+        {error ? <p className="alert-error">{error}</p> : null}
+      </div>
 
+      {/* ── Question panel ── */}
       {current ? (
-        <Surface className="space-y-4">
+        <div className="surface space-y-5">
+          {/* Category + difficulty badge */}
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-white/50">{current.category.name}</p>
-              <h3 className="text-2xl font-black text-white">{current.question.title}</h3>
-            </div>
-            <p className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">
-              {current.question.difficulty}
+            <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)" }}>
+              {current.category.icon} {current.category.name}
             </p>
+            <span
+              style={{
+                padding: "0.3125rem 0.75rem",
+                borderRadius: 9999,
+                border: "1.5px solid var(--ink-faint)",
+                backgroundColor: "var(--card)",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--ink-muted)",
+              }}
+            >
+              {current.question.difficulty}
+            </span>
           </div>
 
+          {/* Media */}
           {current.question.mediaUrl && current.question.modality === "image" ? (
             <Image
               alt={current.question.mediaAltText ?? ""}
-              className="w-full rounded-[24px] border border-white/10 bg-white/5"
+              className="w-full rounded-2xl"
+              style={{ border: "1.5px solid var(--ink-faint)" }}
               height={480}
               src={current.question.mediaUrl}
               unoptimized
               width={800}
             />
           ) : null}
-
           {current.question.mediaUrl && current.question.modality === "audio" ? (
             <audio className="w-full" controls src={current.question.mediaUrl}>
               Your browser does not support audio playback.
             </audio>
           ) : null}
 
-          <p className="text-lg text-slate-100">{current.question.prompt}</p>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            {(Object.entries(current.question.options) as Array<[AnswerKey, string]>).map(([key, value]) => (
-              <button
-                key={key}
-                className={`rounded-[24px] border px-4 py-4 text-left text-base font-semibold transition ${
-                  selectedAnswer === key
-                    ? "border-orange-300/40 bg-orange-300/10 text-white"
-                    : "border-white/10 bg-white/5 text-slate-200 hover:border-cyan-300/30 hover:bg-cyan-300/10"
-                }`}
-                onClick={() => setSelectedAnswer(key)}
-                type="button"
-              >
-                <span className="mr-2 text-sm uppercase tracking-[0.2em] text-white/50">{key}</span>
-                {value}
-              </button>
-            ))}
+          {/* Title + prompt */}
+          <div>
+            <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)" }}>
+              {current.question.title}
+            </p>
+            <h3
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 800,
+                fontSize: "clamp(1.25rem, 3vw, 1.5rem)",
+                lineHeight: 1.25,
+                color: "var(--ink)",
+                marginTop: "0.375rem",
+              }}
+            >
+              {current.question.prompt}
+            </h3>
           </div>
 
+          {/* Answer tiles */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(Object.entries(current.question.options) as Array<[AnswerKey, string]>).map(
+              ([key, value]) => {
+                const isSelected = selectedAnswer === key;
+                const isThisCorrect = key === current.question.correctAnswer;
+                const showResult = submitted;
+
+                let tileClass = "answer-tile";
+                let style: React.CSSProperties = {};
+
+                if (showResult) {
+                  if (isThisCorrect) {
+                    style = {
+                      backgroundColor: "var(--forest-light)",
+                      borderColor: "var(--forest)",
+                      boxShadow: `0 2px 0 color-mix(in oklch, var(--forest) 30%, transparent)`,
+                    };
+                  } else if (isSelected && !isThisCorrect) {
+                    style = {
+                      backgroundColor: "var(--berry-light)",
+                      borderColor: "var(--berry)",
+                      boxShadow: `0 2px 0 color-mix(in oklch, var(--berry) 30%, transparent)`,
+                    };
+                  }
+                } else if (isSelected) {
+                  tileClass = "answer-tile selected";
+                }
+
+                return (
+                  <button
+                    key={key}
+                    className={tileClass}
+                    style={style}
+                    disabled={submitted}
+                    onClick={() => setSelectedAnswer(key)}
+                    type="button"
+                  >
+                    <span className="answer-tile-key">{key.toUpperCase()}</span>
+                    <span>{value}</span>
+                    {showResult && isThisCorrect ? (
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          color: "var(--forest)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✓
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              },
+            )}
+          </div>
+
+          {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <button
               className={primaryButtonClass}
@@ -178,35 +307,97 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
               Lock answer
             </button>
             {submitted && !isComplete ? (
-              <button className={secondaryButtonClass} onClick={() => startTransition(() => void fetchQuestion())} type="button">
-                Next question
+              <button
+                className={secondaryButtonClass}
+                onClick={() => startTransition(() => void fetchQuestion())}
+                type="button"
+              >
+                Next question →
               </button>
             ) : null}
           </div>
 
+          {/* Result explanation */}
           {submitted ? (
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
-              <p className="font-semibold text-white">
-                {selectedAnswer === current.question.correctAnswer ? "Correct!" : "Not quite this time."}
+            <div
+              style={{
+                padding: "1rem 1.25rem",
+                borderRadius: 14,
+                border: `1.5px solid ${isCorrect ? "color-mix(in oklch, var(--forest) 40%, transparent)" : "color-mix(in oklch, var(--berry) 35%, transparent)"}`,
+                backgroundColor: isCorrect ? "var(--forest-light)" : "var(--berry-light)",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 800,
+                  fontSize: "1rem",
+                  color: isCorrect ? "var(--forest)" : "var(--berry)",
+                }}
+              >
+                {isCorrect ? "Correct! ✓" : "Not quite."}
               </p>
-              <p>
+              <p style={{ fontSize: "0.875rem", color: "var(--ink)", marginTop: "0.25rem" }}>
                 Correct answer:{" "}
-                <span className="font-semibold text-cyan-200">
-                  {current.question.options[current.question.correctAnswer]}
-                </span>
+                <strong>{current.question.options[current.question.correctAnswer]}</strong>
               </p>
-              <p className="mt-2 text-slate-300">{current.question.explanation}</p>
+              {current.question.explanation ? (
+                <p
+                  style={{
+                    fontSize: "0.8125rem",
+                    color: "var(--ink-muted)",
+                    marginTop: "0.5rem",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {current.question.explanation}
+                </p>
+              ) : null}
             </div>
           ) : null}
-        </Surface>
+        </div>
       ) : null}
 
+      {/* ── Completion screen ── */}
       {isComplete ? (
-        <Surface className="space-y-2 text-center">
-          <p className="text-sm uppercase tracking-[0.28em] text-cyan-200/80">Practice Complete</p>
-          <h3 className="text-3xl font-black text-white">Finished 10 questions</h3>
-          <p className="text-lg text-slate-300">You scored {correctCount} out of 10.</p>
-        </Surface>
+        <div
+          className="surface"
+          style={{
+            textAlign: "center",
+            borderColor: "var(--warm)",
+            borderWidth: 2,
+            backgroundColor: "color-mix(in oklch, var(--warm) 10%, var(--card))",
+          }}
+        >
+          <p className="section-eyebrow">Practice complete</p>
+          <h2
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: "clamp(1.75rem, 5vw, 2.5rem)",
+              letterSpacing: "-0.02em",
+              color: "var(--ink)",
+              marginTop: "0.5rem",
+            }}
+          >
+            {correctCount} / 10 correct
+          </h2>
+          <p style={{ fontSize: "1.0625rem", color: "var(--ink-muted)", marginTop: "0.5rem" }}>
+            {correctCount >= 8
+              ? "Excellent work! 🎉"
+              : correctCount >= 5
+                ? "Good effort — keep practising!"
+                : "Keep going, you'll get there!"}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 mt-5">
+            <Link className={primaryButtonClass} href="/solo">
+              Try again
+            </Link>
+            <Link className={secondaryButtonClass} href="/">
+              Back home
+            </Link>
+          </div>
+        </div>
       ) : null}
     </div>
   );

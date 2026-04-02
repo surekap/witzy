@@ -1,78 +1,201 @@
+import Image from "next/image";
 import Link from "next/link";
 
-import { Surface, primaryButtonClass, secondaryButtonClass } from "@/components/ui";
+import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 
 const pathways = [
   {
+    number: "01",
     title: "Host a game",
-    description: "Spin up a room, pick the round settings, and control the live reveal.",
+    description: "Spin up a room, set the rules, and control the pace of each live round.",
     href: "/host",
+    cardClass: "pathway-card pathway-card-coral",
+    numColor: "var(--coral)",
+    linkColor: "var(--coral)",
   },
   {
+    number: "02",
     title: "Join a game",
-    description: "Enter a room code, choose an age band, and get your personalized challenge.",
+    description: "Enter a room code, pick your age band, and get your personalized challenge.",
     href: "/join",
+    cardClass: "pathway-card pathway-card-forest",
+    numColor: "var(--forest)",
+    linkColor: "var(--forest)",
   },
   {
+    number: "03",
     title: "Solo practice",
-    description: "Test the question engine with a 10-question practice run.",
+    description: "Test the question engine with a 10-question adaptive practice run.",
     href: "/solo",
+    cardClass: "pathway-card pathway-card-warm",
+    numColor: "var(--warm-deep)",
+    linkColor: "var(--warm-deep)",
   },
-];
+] as const;
 
 export default function HomePage() {
   return (
-    <div className="space-y-6">
-      <Surface className="overflow-hidden p-0">
-        <div className="grid gap-8 p-6 md:grid-cols-[1.3fr_0.8fr] md:p-10">
-          <div className="space-y-6">
-            <p className="text-sm uppercase tracking-[0.32em] text-cyan-200/80">Kids Quiz Live</p>
-            <div className="space-y-4">
-              <h1 className="max-w-3xl text-5xl font-black tracking-tight text-white sm:text-6xl">
-                Shared categories, private difficulty, big family energy.
-              </h1>
-              <p className="max-w-2xl text-lg text-slate-300">
-                Kids answer simultaneously on their own devices while the host runs a lively, synchronized quiz room.
-                Everyone gets the same category, but the challenge is tuned to their level.
+    <div className="space-y-12">
+      {/* ── Nav ── */}
+      <header className="flex items-center justify-between pt-2">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <Image
+            src="/media/logo.png"
+            alt="Kids Quiz Live logo"
+            width={36}
+            height={36}
+            className="rounded-lg"
+            unoptimized
+          />
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: "1.0625rem",
+              color: "var(--ink)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Kids Quiz Live
+          </span>
+        </Link>
+        <Link href="/join" className="btn btn-secondary btn-sm">
+          Join a room →
+        </Link>
+      </header>
+
+      {/* ── Hero ── */}
+      <section className="space-y-6 py-4">
+        <p className="section-eyebrow">Live multiplayer quiz</p>
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 800,
+            fontSize: "clamp(2.75rem, 7vw, 4.25rem)",
+            lineHeight: 1.08,
+            letterSpacing: "-0.02em",
+            color: "var(--ink)",
+            maxWidth: "700px",
+          }}
+        >
+          Shared category.
+          <br />
+          Private difficulty.
+          <br />
+          <span style={{ color: "var(--coral)" }}>Big family energy.</span>
+        </h1>
+        <p
+          style={{
+            fontSize: "1.125rem",
+            color: "var(--ink-muted)",
+            maxWidth: "520px",
+            lineHeight: 1.65,
+          }}
+        >
+          Kids answer simultaneously on their own devices. Everyone gets the same category
+          — but each question is tuned to their level.
+        </p>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Link className={primaryButtonClass} href="/host">
+            Host a game
+          </Link>
+          <Link className={secondaryButtonClass} href="/join">
+            Join a room
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Pathways ── */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {pathways.map((p) => (
+          <Link key={p.title} href={p.href} className={p.cardClass}>
+            <div>
+              <p
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 800,
+                  fontSize: "2.25rem",
+                  lineHeight: 1,
+                  color: p.numColor,
+                  opacity: 0.35,
+                }}
+              >
+                {p.number}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: "1.1875rem",
+                  marginTop: "0.5rem",
+                  color: "var(--ink)",
+                }}
+              >
+                {p.title}
+              </p>
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  color: "var(--ink-muted)",
+                  marginTop: "0.375rem",
+                  lineHeight: 1.55,
+                }}
+              >
+                {p.description}
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link className={primaryButtonClass} href="/host">
-                Host a game
-              </Link>
-              <Link className={secondaryButtonClass} href="/join">
-                Join a room
-              </Link>
-            </div>
-          </div>
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: "0.875rem",
+                color: p.linkColor,
+              }}
+            >
+              Open →
+            </p>
+          </Link>
+        ))}
+      </div>
 
-          <div className="grid gap-4">
-            {[
-              ["Live rooms", "Hosts control pacing with lobby sync, countdowns, reveals, and rematches."],
-              ["Equal challenge", "Age bands and adaptive difficulty keep every round fair without using the same question for everyone."],
-              ["Media ready", "Text, image, and audio questions all work inside the same round loop."],
-            ].map(([title, body]) => (
-              <div key={title} className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-                <p className="text-sm uppercase tracking-[0.2em] text-cyan-200/80">{title}</p>
-                <p className="mt-2 text-sm text-slate-300">{body}</p>
-              </div>
-            ))}
+      {/* ── Feature callouts ── */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          {
+            label: "Live rooms",
+            text: "Hosts control pacing with lobby sync, countdowns, reveals, and rematches.",
+          },
+          {
+            label: "Equal challenge",
+            text: "Age bands and adaptive difficulty keep every round fair — without using the same question twice.",
+          },
+          {
+            label: "Media ready",
+            text: "Text, image, and audio questions all work inside the same round loop.",
+          },
+        ].map(({ label, text }) => (
+          <div key={label} className="feature-callout">
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: "0.9375rem",
+                color: "var(--ink)",
+              }}
+            >
+              {label}
+            </p>
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "var(--ink-muted)",
+                marginTop: "0.375rem",
+                lineHeight: 1.55,
+              }}
+            >
+              {text}
+            </p>
           </div>
-        </div>
-      </Surface>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {pathways.map((pathway) => (
-          <Surface key={pathway.title} className="flex flex-col justify-between gap-6">
-            <div className="space-y-3">
-              <p className="text-sm uppercase tracking-[0.2em] text-cyan-200/80">{pathway.title}</p>
-              <h2 className="text-2xl font-black text-white">{pathway.title}</h2>
-              <p className="text-sm text-slate-300">{pathway.description}</p>
-            </div>
-            <Link className={secondaryButtonClass} href={pathway.href}>
-              Open
-            </Link>
-          </Surface>
         ))}
       </div>
     </div>
