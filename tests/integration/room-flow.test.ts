@@ -15,9 +15,9 @@ describe("room flow", () => {
     resetStore();
   });
 
-  it("creates a room, accepts answers, and reveals a leaderboard", () => {
-    const categories = getCategories();
-    const room = createRoom({
+  it("creates a room, accepts answers, and reveals a leaderboard", async () => {
+    const categories = await getCategories();
+    const room = await createRoom({
       hostName: "Morgan",
       config: {
         numberOfRounds: 5,
@@ -31,7 +31,7 @@ describe("room flow", () => {
       },
     });
 
-    const firstPlayer = joinRoom(
+    const firstPlayer = await joinRoom(
       room.roomCode,
       {
         displayName: "Ava",
@@ -41,7 +41,7 @@ describe("room flow", () => {
       },
       null,
     );
-    const secondPlayer = joinRoom(
+    const secondPlayer = await joinRoom(
       room.roomCode,
       {
         displayName: "Noah",
@@ -52,8 +52,8 @@ describe("room flow", () => {
       null,
     );
 
-    startGame(room.roomCode, room.sessionKey);
-    startRound(room.roomCode, room.sessionKey, categories[0].id);
+    await startGame(room.roomCode, room.sessionKey);
+    await startRound(room.roomCode, room.sessionKey, categories[0].id);
 
     const liveRoom = getStore().rooms.get(room.roomCode);
     expect(liveRoom).toBeDefined();
@@ -65,23 +65,23 @@ describe("room flow", () => {
     expect(firstAssignment).toBeDefined();
     expect(secondAssignment).toBeDefined();
 
-    submitAnswer(room.roomCode, firstPlayer.sessionKey, {
+    await submitAnswer(room.roomCode, firstPlayer.sessionKey, {
       assignedQuestionId: firstAssignment!.id,
       answerKey: firstAssignment!.questionSnapshot.correctAnswer,
       confidenceMode: "bold",
       useHint: false,
     });
-    submitAnswer(room.roomCode, secondPlayer.sessionKey, {
+    await submitAnswer(room.roomCode, secondPlayer.sessionKey, {
       assignedQuestionId: secondAssignment!.id,
       answerKey: "D",
       confidenceMode: "safe",
       useHint: false,
     });
 
-    const lockedState = getRoomState(room.roomCode, room.sessionKey);
+    const lockedState = await getRoomState(room.roomCode, room.sessionKey);
     expect(lockedState.currentRound?.status).toBe("locked");
 
-    const revealedState = revealRound(room.roomCode, room.sessionKey);
+    const revealedState = await revealRound(room.roomCode, room.sessionKey);
     expect(revealedState.revealedRound?.results).toHaveLength(2);
     expect(revealedState.leaderboard[0]?.displayName).toBe("Ava");
   });

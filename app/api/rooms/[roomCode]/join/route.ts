@@ -20,7 +20,7 @@ export async function POST(
 
   try {
     const existingSessionKey = await getRoomSessionKey(roomCode);
-    const result = joinRoom(roomCode, parsed.data, existingSessionKey);
+    const result = await joinRoom(roomCode, parsed.data, existingSessionKey);
     await setRoomSessionKey(roomCode, result.sessionKey);
 
     return Response.json(

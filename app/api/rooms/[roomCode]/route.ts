@@ -12,7 +12,7 @@ export async function GET(
 
   try {
     const sessionKey = await getRoomSessionKey(roomCode);
-    return Response.json(getRoomState(roomCode, sessionKey));
+    return Response.json(await getRoomState(roomCode, sessionKey));
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't load that room.", 400);
   }

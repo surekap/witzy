@@ -21,7 +21,7 @@ export async function POST(
   try {
     const sessionKey = await getRoomSessionKey(roomCode);
     return Response.json(
-      submitAnswer(roomCode, sessionKey, {
+      await submitAnswer(roomCode, sessionKey, {
         assignedQuestionId: parsed.data.assignedQuestionId,
         answerKey: parsed.data.answerKey,
         confidenceMode: parsed.data.confidenceMode,

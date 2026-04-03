@@ -10,7 +10,7 @@ export async function GET(
   const { roomCode } = await context.params;
 
   try {
-    return Response.json(getLeaderboard(roomCode));
+    return Response.json(await getLeaderboard(roomCode));
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't load the leaderboard.", 400);
   }

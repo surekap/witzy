@@ -12,7 +12,7 @@ export async function POST(
 
   try {
     const sessionKey = await getRoomSessionKey(roomCode);
-    return Response.json(startGame(roomCode, sessionKey));
+    return Response.json(await startGame(roomCode, sessionKey));
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't start the game.", 400);
   }

@@ -20,7 +20,7 @@ export async function POST(
 
   try {
     const sessionKey = await getRoomSessionKey(roomCode);
-    return Response.json(startRound(roomCode, sessionKey, parsed.data.categoryId));
+    return Response.json(await startRound(roomCode, sessionKey, parsed.data.categoryId));
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't start the round.", 400);
   }

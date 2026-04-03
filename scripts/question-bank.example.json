@@ -1,0 +1,58 @@
+{
+  "categories": [
+    {
+      "slug": "space",
+      "name": "Space",
+      "icon": "🚀"
+    },
+    {
+      "slug": "animals",
+      "name": "Animals",
+      "icon": "🦁"
+    }
+  ],
+  "questions": [
+    {
+      "categorySlug": "space",
+      "title": "Planet order",
+      "prompt": "Which planet is known as the Red Planet?",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Mars",
+        "B": "Venus",
+        "C": "Jupiter",
+        "D": "Mercury"
+      },
+      "correctAnswer": "A",
+      "explanation": "Mars is often called the Red Planet because of its reddish surface.",
+      "estimatedSeconds": 12,
+      "tags": ["space", "planets"]
+    },
+    {
+      "categorySlug": "animals",
+      "title": "Sound match",
+      "prompt": "Listen to the animal sound and pick the correct animal.",
+      "modality": "audio",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Lion",
+        "B": "Dolphin",
+        "C": "Elephant",
+        "D": "Frog"
+      },
+      "correctAnswer": "C",
+      "explanation": "The trumpet-like sound belongs to an elephant.",
+      "mediaUrl": "https://example.com/media/elephant-call.mp3",
+      "mediaAltText": "An elephant call audio clip",
+      "estimatedSeconds": 18,
+      "tags": ["animals", "audio"]
+    }
+  ]
+}

@@ -3,9 +3,18 @@ create extension if not exists pgcrypto;
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   display_name text not null,
+  username text,
+  password_hash text,
+  password_salt text,
   role text,
+  last_login_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table users add column if not exists username text;
+alter table users add column if not exists password_hash text;
+alter table users add column if not exists password_salt text;
+alter table users add column if not exists last_login_at timestamptz;
 
 create table if not exists game_rooms (
   id uuid primary key default gen_random_uuid(),
@@ -21,9 +30,14 @@ create table if not exists game_rooms (
   team_bonus boolean not null default false,
   hints boolean not null default false,
   current_round_number integer not null default 0,
+  room_state jsonb,
+  room_state_version bigint not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table game_rooms add column if not exists room_state jsonb;
+alter table game_rooms add column if not exists room_state_version bigint not null default 0;
 
 create table if not exists game_players (
   id uuid primary key default gen_random_uuid(),
@@ -117,3 +131,16 @@ create index if not exists idx_round_questions_round on round_questions(game_rou
 create index if not exists idx_round_answers_round_question on round_answers(round_question_id);
 create index if not exists idx_questions_category on questions(category_id);
 create index if not exists idx_questions_active_difficulty on questions(active, difficulty);
+create unique index if not exists idx_users_username_lower on users(lower(username)) where username is not null;
+
+create table if not exists practice_question_attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  question_id uuid not null references questions(id) on delete cascade,
+  submitted_answer text not null,
+  is_correct boolean not null,
+  answered_at timestamptz not null default now()
+);
+
+create index if not exists idx_practice_attempts_user on practice_question_attempts(user_id, answered_at desc);
+create index if not exists idx_practice_attempts_question on practice_question_attempts(question_id);

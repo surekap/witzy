@@ -12,7 +12,7 @@ export async function POST(
 
   try {
     const sessionKey = await getRoomSessionKey(roomCode);
-    return Response.json(lockRound(roomCode, sessionKey));
+    return Response.json(await lockRound(roomCode, sessionKey));
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't lock the round.", 400);
   }

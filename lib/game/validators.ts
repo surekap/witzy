@@ -56,3 +56,13 @@ export const soloQuestionSchema = z.object({
   ]).optional(),
   askedQuestionIds: z.array(z.string()).default([]),
 });
+
+export const practiceAuthSchema = z.object({
+  username: z.string().trim().min(2).max(30),
+  password: z.string().min(4).max(64),
+});
+
+export const soloAnswerSchema = z.object({
+  questionId: z.string().trim().min(1),
+  answerKey: z.union([z.literal("A"), z.literal("B"), z.literal("C"), z.literal("D")]),
+});

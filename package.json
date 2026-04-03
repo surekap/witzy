@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "db:init": "tsx scripts/init-schema.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "import:questions": "tsx scripts/import-questions.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

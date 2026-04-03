@@ -1,4 +1,10 @@
 import { assignQuestionForPlayer, resolvePlayerDifficulty } from "@/lib/questions/assignment";
+import {
+  insertRoomStateIntoDatabase,
+  loadQuestionBankFromDatabase,
+  loadRoomStateFromDatabase,
+  updateRoomStateInDatabase,
+} from "@/lib/db/runtime-storage";
 import { scoreRoundAnswers } from "@/lib/scoring/score-round";
 import { getStore } from "@/lib/game/store";
 import { env } from "@/lib/utils/env";
@@ -367,7 +373,7 @@ function synchronizeRound(room: GameRoom) {
   }
 }
 
-export function createRoom(input: { hostName: string; config: GameConfig }) {
+function createRoomInMemory(input: { hostName: string; config: GameConfig }) {
   const store = getStore();
 
   let roomCode = createRoomCode();
@@ -398,7 +404,7 @@ export function createRoom(input: { hostName: string; config: GameConfig }) {
   };
 }
 
-export function joinRoom(
+function joinRoomInMemory(
   roomCode: string,
   input: {
     displayName: string;
@@ -468,7 +474,7 @@ export function joinRoom(
   };
 }
 
-export function startGame(roomCode: string, sessionKey: string | null) {
+function startGameInMemory(roomCode: string, sessionKey: string | null) {
   const room = getRoomOrThrow(roomCode);
   ensureHost(room, sessionKey);
 
@@ -481,7 +487,7 @@ export function startGame(roomCode: string, sessionKey: string | null) {
   return buildRoomView(room, resolveViewer(room, sessionKey));
 }
 
-export function startRound(roomCode: string, sessionKey: string | null, requestedCategoryId?: string) {
+function startRoundInMemory(roomCode: string, sessionKey: string | null, requestedCategoryId?: string) {
   const room = getRoomOrThrow(roomCode);
   ensureHost(room, sessionKey);
   synchronizeRound(room);
@@ -563,7 +569,7 @@ export function startRound(roomCode: string, sessionKey: string | null, requeste
   return buildRoomView(room, resolveViewer(room, sessionKey));
 }
 
-export function submitAnswer(
+function submitAnswerInMemory(
   roomCode: string,
   sessionKey: string | null,
   input: {
@@ -619,7 +625,7 @@ export function submitAnswer(
   return buildRoomView(room, resolveViewer(room, sessionKey));
 }
 
-export function lockRound(roomCode: string, sessionKey: string | null) {
+function lockRoundInMemory(roomCode: string, sessionKey: string | null) {
   const room = getRoomOrThrow(roomCode);
   ensureHost(room, sessionKey);
   const round = lockCurrentRound(room);
@@ -631,7 +637,7 @@ export function lockRound(roomCode: string, sessionKey: string | null) {
   return buildRoomView(room, resolveViewer(room, sessionKey));
 }
 
-export function revealRound(roomCode: string, sessionKey: string | null) {
+function revealRoundInMemory(roomCode: string, sessionKey: string | null) {
   const room = getRoomOrThrow(roomCode);
   ensureHost(room, sessionKey);
   const round = getCurrentRound(room);
@@ -651,20 +657,20 @@ export function revealRound(roomCode: string, sessionKey: string | null) {
   return buildRoomView(room, resolveViewer(room, sessionKey));
 }
 
-export function getRoomState(roomCode: string, sessionKey: string | null) {
+function getRoomStateInMemory(roomCode: string, sessionKey: string | null) {
   const room = getRoomOrThrow(roomCode);
   synchronizeRound(room);
   const viewer = resolveViewer(room, sessionKey);
   return buildRoomView(room, viewer);
 }
 
-export function getLeaderboard(roomCode: string) {
+function getLeaderboardInMemory(roomCode: string) {
   const room = getRoomOrThrow(roomCode);
   synchronizeRound(room);
   return sortLeaderboard(room.players);
 }
 
-export function getSoloQuestion(input: {
+function getSoloQuestionInMemory(input: {
   categoryId: string;
   ageBand: AgeBand;
   difficultyMode?: GamePlayer["difficultyMode"];
@@ -701,6 +707,207 @@ export function getSoloQuestion(input: {
   };
 }
 
-export function getCategories() {
+function getCategoriesInMemory() {
   return [...getStore().categories];
+}
+
+const RUNTIME_ROOM_RETRIES = 3;
+
+async function withScratchStore<T>(
+  options: {
+    roomCode?: string;
+  },
+  callback: () => T,
+) {
+  const previousStore = globalThis.__kidsQuizStore;
+  const { categories, questions } = await loadQuestionBankFromDatabase();
+  const rooms = new Map<string, GameRoom>();
+  let version: number | null = null;
+
+  if (options.roomCode) {
+    const persistedRoom = await loadRoomStateFromDatabase(options.roomCode);
+    if (!persistedRoom) {
+      throw new GameError("That room code doesn't exist yet.", 404);
+    }
+
+    rooms.set(persistedRoom.room.roomCode, persistedRoom.room);
+    version = persistedRoom.version;
+  }
+
+  globalThis.__kidsQuizStore = {
+    categories,
+    questions,
+    rooms,
+  };
+
+  try {
+    const result = callback();
+
+    return {
+      result,
+      rooms,
+      version,
+    };
+  } finally {
+    globalThis.__kidsQuizStore = previousStore;
+  }
+}
+
+async function withPersistedRoom<T>(roomCode: string, callback: () => T) {
+  let attempts = 0;
+
+  while (attempts < RUNTIME_ROOM_RETRIES) {
+    attempts += 1;
+
+    const { result, rooms, version } = await withScratchStore({ roomCode }, callback);
+    const updatedRoom = rooms.get(roomCode.toUpperCase());
+
+    if (!updatedRoom || version === null) {
+      throw new GameError("That room code doesn't exist yet.", 404);
+    }
+
+    const nextVersion = await updateRoomStateInDatabase(updatedRoom, version);
+    if (nextVersion !== null) {
+      return result;
+    }
+  }
+
+  throw new GameError("That room changed while this action was running. Please try again.", 409);
+}
+
+export async function createRoom(input: { hostName: string; config: GameConfig }) {
+  if (env.NODE_ENV === "test") {
+    return createRoomInMemory(input);
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const { result, rooms } = await withScratchStore({}, () => createRoomInMemory(input));
+      const createdRoom = rooms.get(result.roomCode);
+
+      if (!createdRoom) {
+        throw new GameError("The new room state could not be created.", 500);
+      }
+
+      await insertRoomStateIntoDatabase(createdRoom);
+      return result;
+    } catch (error) {
+      if (
+        attempt < 4 &&
+        error instanceof Error &&
+        /duplicate|unique/i.test(error.message)
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new GameError("Couldn't create the room.", 500);
+}
+
+export async function joinRoom(
+  roomCode: string,
+  input: {
+    displayName: string;
+    ageBand: AgeBand;
+    difficultyMode: GamePlayer["difficultyMode"];
+    avatarColor: string;
+  },
+  existingSessionKey: string | null,
+) {
+  if (env.NODE_ENV === "test") {
+    return joinRoomInMemory(roomCode, input, existingSessionKey);
+  }
+
+  return withPersistedRoom(roomCode, () => joinRoomInMemory(roomCode, input, existingSessionKey));
+}
+
+export async function startGame(roomCode: string, sessionKey: string | null) {
+  if (env.NODE_ENV === "test") {
+    return startGameInMemory(roomCode, sessionKey);
+  }
+
+  return withPersistedRoom(roomCode, () => startGameInMemory(roomCode, sessionKey));
+}
+
+export async function startRound(roomCode: string, sessionKey: string | null, requestedCategoryId?: string) {
+  if (env.NODE_ENV === "test") {
+    return startRoundInMemory(roomCode, sessionKey, requestedCategoryId);
+  }
+
+  return withPersistedRoom(roomCode, () => startRoundInMemory(roomCode, sessionKey, requestedCategoryId));
+}
+
+export async function submitAnswer(
+  roomCode: string,
+  sessionKey: string | null,
+  input: {
+    assignedQuestionId: string;
+    answerKey: AnswerKey;
+    confidenceMode?: ConfidenceMode;
+    useHint?: boolean;
+  },
+) {
+  if (env.NODE_ENV === "test") {
+    return submitAnswerInMemory(roomCode, sessionKey, input);
+  }
+
+  return withPersistedRoom(roomCode, () => submitAnswerInMemory(roomCode, sessionKey, input));
+}
+
+export async function lockRound(roomCode: string, sessionKey: string | null) {
+  if (env.NODE_ENV === "test") {
+    return lockRoundInMemory(roomCode, sessionKey);
+  }
+
+  return withPersistedRoom(roomCode, () => lockRoundInMemory(roomCode, sessionKey));
+}
+
+export async function revealRound(roomCode: string, sessionKey: string | null) {
+  if (env.NODE_ENV === "test") {
+    return revealRoundInMemory(roomCode, sessionKey);
+  }
+
+  return withPersistedRoom(roomCode, () => revealRoundInMemory(roomCode, sessionKey));
+}
+
+export async function getRoomState(roomCode: string, sessionKey: string | null) {
+  if (env.NODE_ENV === "test") {
+    return getRoomStateInMemory(roomCode, sessionKey);
+  }
+
+  return withPersistedRoom(roomCode, () => getRoomStateInMemory(roomCode, sessionKey));
+}
+
+export async function getLeaderboard(roomCode: string) {
+  if (env.NODE_ENV === "test") {
+    return getLeaderboardInMemory(roomCode);
+  }
+
+  return withPersistedRoom(roomCode, () => getLeaderboardInMemory(roomCode));
+}
+
+export async function getSoloQuestion(input: {
+  categoryId: string;
+  ageBand: AgeBand;
+  difficultyMode?: GamePlayer["difficultyMode"];
+  askedQuestionIds: string[];
+}) {
+  if (env.NODE_ENV === "test") {
+    return getSoloQuestionInMemory(input);
+  }
+
+  const { result } = await withScratchStore({}, () => getSoloQuestionInMemory(input));
+  return result;
+}
+
+export async function getCategories() {
+  if (env.NODE_ENV === "test") {
+    return getCategoriesInMemory();
+  }
+
+  const { categories } = await loadQuestionBankFromDatabase();
+  return categories;
 }

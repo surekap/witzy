@@ -197,31 +197,194 @@ const seedCategories: SeedCategory[] = [
   },
 ];
 
-const ageRangeByDifficulty: Record<QuestionDifficulty, { min: AgeBand; max: AgeBand }> = {
-  easy: { min: "6_to_8", max: "9_to_11" },
-  medium: { min: "9_to_11", max: "12_to_14" },
-  hard: { min: "12_to_14", max: "15_plus" },
+const tones = ["#ea580c", "#0f766e", "#2563eb", "#be185d", "#7c3aed", "#0891b2"];
+
+const promptTemplates: Record<QuestionDifficulty, string[]> = {
+  easy: [
+    'Which answer best matches this clue about {category}? {clue}',
+    'Pick the best {category} answer for this clue: {clue}',
+    'Warm-up clue: in {category}, which choice fits best? {clue}',
+  ],
+  medium: [
+    'True or false: {statement}',
+    'Decide whether this {category} statement is true or false: {statement}',
+    'Quick check: true or false? {statement}',
+  ],
+  hard: [
+    'Advanced clue: {fact} Which answer fits best?',
+    'Challenge round: use this fact to choose the strongest {category} answer. {fact}',
+    'Think carefully: {fact} Which option is the best match?',
+  ],
 };
 
-const tones = ["#ea580c", "#0f766e", "#2563eb", "#be185d", "#7c3aed", "#0891b2"];
+const ageRangeVariantsByDifficulty: Record<QuestionDifficulty, Array<{ min: AgeBand; max: AgeBand }>> = {
+  easy: [
+    { min: "6_to_8", max: "6_to_8" },
+    { min: "6_to_8", max: "9_to_11" },
+    { min: "6_to_8", max: "12_to_14" },
+    { min: "9_to_11", max: "9_to_11" },
+  ],
+  medium: [
+    { min: "6_to_8", max: "9_to_11" },
+    { min: "9_to_11", max: "9_to_11" },
+    { min: "9_to_11", max: "12_to_14" },
+    { min: "6_to_8", max: "12_to_14" },
+    { min: "9_to_11", max: "15_plus" },
+  ],
+  hard: [
+    { min: "9_to_11", max: "12_to_14" },
+    { min: "12_to_14", max: "12_to_14" },
+    { min: "12_to_14", max: "15_plus" },
+    { min: "9_to_11", max: "15_plus" },
+    { min: "15_plus", max: "15_plus" },
+  ],
+};
+
+const imageMediaCategories = new Set(["geography", "art", "movies", "history"]);
+const audioMediaCategories = new Set(["music", "movies"]);
 
 function buildCategoryId(index: number) {
   return `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`;
 }
 
-function buildQuestionId(categoryIndex: number, itemIndex: number, difficultyIndex: number) {
+function buildQuestionId(categoryIndex: number, itemIndex: number, variantIndex: number) {
   return `10000000-${categoryIndex.toString().padStart(4, "0")}-4000-${itemIndex
     .toString()
-    .padStart(4, "0")}-${difficultyIndex.toString().padStart(12, "0")}`;
+    .padStart(4, "0")}-${variantIndex.toString().padStart(12, "0")}`;
 }
 
-function buildBaseOptions(correct: string, distractors: [string, string, string]) {
+function rotateOptions(correct: string, distractors: [string, string, string], variantIndex: number) {
+  const keys: AnswerKey[] = ["A", "B", "C", "D"];
+  const values = [correct, ...distractors];
+  const offset = variantIndex % values.length;
+  const rotated = values.slice(offset).concat(values.slice(0, offset));
+  const correctAnswer = keys[rotated.indexOf(correct)];
+
   return {
-    A: correct,
-    B: distractors[0],
-    C: distractors[1],
-    D: distractors[2],
-  } as Partial<Record<AnswerKey, string>>;
+    options: {
+      A: rotated[0],
+      B: rotated[1],
+      C: rotated[2],
+      D: rotated[3],
+    } satisfies Partial<Record<AnswerKey, string>>,
+    correctAnswer,
+  };
+}
+
+function buildDistractorSet(category: SeedCategory, itemIndex: number, variantIndex: number): [string, string, string] {
+  const otherAnswers = category.items
+    .filter((_, candidateIndex) => candidateIndex !== itemIndex)
+    .map((candidate) => candidate.correct);
+  const combinations: [string, string, string][] = [];
+
+  for (let first = 0; first < otherAnswers.length - 2; first += 1) {
+    for (let second = first + 1; second < otherAnswers.length - 1; second += 1) {
+      for (let third = second + 1; third < otherAnswers.length; third += 1) {
+        combinations.push([otherAnswers[first], otherAnswers[second], otherAnswers[third]]);
+      }
+    }
+  }
+
+  return combinations[variantIndex % combinations.length];
+}
+
+function getItemByAnswer(category: SeedCategory, answer: string) {
+  const item = category.items.find((candidate) => candidate.correct === answer);
+
+  if (!item) {
+    throw new Error(`Missing seed item for answer "${answer}" in ${category.slug}`);
+  }
+
+  return item;
+}
+
+function buildTrueFalseOptions(isTrueStatement: boolean, variantIndex: number) {
+  const truthFirst = variantIndex % 2 === 0;
+  const options = truthFirst
+    ? ({ A: "True", B: "False" } satisfies Partial<Record<AnswerKey, string>>)
+    : ({ A: "False", B: "True" } satisfies Partial<Record<AnswerKey, string>>);
+
+  const correctAnswer: AnswerKey = isTrueStatement
+    ? truthFirst
+      ? "A"
+      : "B"
+    : truthFirst
+      ? "B"
+      : "A";
+
+  return { options, correctAnswer };
+}
+
+function resolveAgeRange(difficulty: QuestionDifficulty, variantIndex: number) {
+  const ranges = ageRangeVariantsByDifficulty[difficulty];
+  return ranges[variantIndex % ranges.length];
+}
+
+function interpolateTemplate(
+  template: string,
+  values: Record<"category" | "clue" | "fact" | "statement", string>,
+) {
+  return template
+    .replaceAll("{category}", values.category)
+    .replaceAll("{clue}", values.clue)
+    .replaceAll("{fact}", values.fact)
+    .replaceAll("{statement}", values.statement);
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildAnswerVariants(answer: string) {
+  const variants = new Set<string>([answer]);
+
+  if (answer.endsWith("y")) {
+    variants.add(`${answer.slice(0, -1)}ies`);
+  }
+
+  variants.add(`${answer}s`);
+  variants.add(`${answer}es`);
+
+  return [...variants].sort((left, right) => right.length - left.length);
+}
+
+function sanitizePromptReference(text: string, answer: string) {
+  return buildAnswerVariants(answer).reduce((current, variant) => {
+    const pattern = new RegExp(`\\b${escapeRegExp(variant)}\\b`, "gi");
+    return current.replace(pattern, "this concept");
+  }, text);
+}
+
+function buildPairOptions(
+  category: SeedCategory,
+  itemIndex: number,
+  distractors: [string, string, string],
+  variantIndex: number,
+) {
+  const item = category.items[itemIndex];
+  const [distractorOne, distractorTwo, distractorThree] = distractors.map((answer) =>
+    getItemByAnswer(category, answer),
+  );
+  const keys: AnswerKey[] = ["A", "B", "C", "D"];
+  const pairCards = [
+    `${item.correct} — ${item.fact}`,
+    `${distractorOne.correct} — ${item.fact}`,
+    `${item.correct} — ${distractorTwo.fact}`,
+    `${distractorThree.correct} — ${distractorOne.clue}`,
+  ];
+  const offset = variantIndex % pairCards.length;
+  const rotated = pairCards.slice(offset).concat(pairCards.slice(0, offset));
+  const correctAnswer = keys[rotated.indexOf(pairCards[0])];
+
+  return {
+    options: {
+      A: rotated[0],
+      B: rotated[1],
+      C: rotated[2],
+      D: rotated[3],
+    } satisfies Partial<Record<AnswerKey, string>>,
+    correctAnswer,
+  };
 }
 
 function buildDifficultyVariant(
@@ -230,85 +393,149 @@ function buildDifficultyVariant(
   categoryId: string,
   itemIndex: number,
   difficulty: QuestionDifficulty,
+  variantIndex: number,
 ) {
   const item = category.items[itemIndex];
-  const baseOptions = buildBaseOptions(item.correct, item.distractors);
+  const distractors = buildDistractorSet(category, itemIndex, variantIndex);
+  const candidateSetText = [item.correct, ...distractors].join(", ");
   const tone = tones[(categoryIndex + itemIndex) % tones.length];
-  const mediaPreference =
-    category.slug === "music" || (category.slug === "movies" && itemIndex % 5 === 0)
-      ? "audio"
-      : category.slug === "geography" || category.slug === "art" || category.slug === "movies"
-        ? "image"
-        : "text";
+  const mediaPreference = audioMediaCategories.has(category.slug)
+    ? "audio"
+    : imageMediaCategories.has(category.slug)
+      ? "image"
+      : "text";
 
   let answerType: AnswerType = "multiple_choice";
   let modality: QuestionModality = "text";
-  let prompt = `Which answer best matches this clue about ${category.name.toLowerCase()}? ${item.clue}`;
+  let prompt = "";
   let explanation = `${item.fact} That makes "${item.correct}" the best match.`;
-  let correctAnswer: AnswerKey = "A";
-  let options = baseOptions;
+  let { options, correctAnswer }: { options: Partial<Record<AnswerKey, string>>; correctAnswer: AnswerKey } =
+    rotateOptions(item.correct, distractors, variantIndex);
   let mediaUrl: string | null = null;
   let mediaAltText: string | null = null;
+  const variantFamily = Math.floor(variantIndex / difficultyOrder.length);
+  const sanitizedClue = sanitizePromptReference(item.clue, item.correct);
+  const sanitizedFact = sanitizePromptReference(item.fact, item.correct);
+  const templateValues = {
+    category: category.name.toLowerCase(),
+    clue: sanitizedClue,
+    fact: sanitizedFact,
+    statement: "",
+  };
 
   if (difficulty === "medium") {
     answerType = "true_false";
-    const isTrueStatement = itemIndex % 2 === 0;
-    const statement = isTrueStatement
-      ? `${item.correct} matches this clue: ${item.clue}.`
-      : `${item.distractors[0]} matches this clue: ${item.clue}.`;
-
-    prompt = `True or false: ${statement}`;
-    options = {
-      A: "True",
-      B: "False",
-    };
-    correctAnswer = isTrueStatement ? "A" : "B";
+    const wrongItem = getItemByAnswer(category, distractors[variantIndex % distractors.length]);
+    const mediumStyle = variantFamily % 4;
+    const isTrueStatement = variantIndex % 2 === 0;
+    const statement =
+      mediumStyle === 0
+        ? isTrueStatement
+          ? `${item.correct} matches this clue: ${item.clue}.`
+          : `${wrongItem.correct} matches this clue: ${item.clue}.`
+        : mediumStyle === 1
+          ? isTrueStatement
+            ? `${item.correct} is best described by this fact: ${item.fact}.`
+            : `${item.correct} is best described by this fact: ${wrongItem.fact}.`
+          : mediumStyle === 2
+            ? isTrueStatement
+              ? `${item.fact} is a true fact about ${item.correct}.`
+              : `${wrongItem.fact} is a true fact about ${item.correct}.`
+            : isTrueStatement
+              ? `${item.correct} belongs with both this clue and fact: ${item.clue}; ${item.fact}`
+              : `${wrongItem.correct} belongs with both this clue and fact: ${item.clue}; ${item.fact}`;
+    templateValues.statement = statement;
+    prompt = interpolateTemplate(
+      promptTemplates.medium[variantIndex % promptTemplates.medium.length],
+      templateValues,
+    );
+    prompt = `${prompt} Candidates in play: ${candidateSetText}.`;
+    ({ options, correctAnswer } = buildTrueFalseOptions(isTrueStatement, variantIndex));
     explanation = isTrueStatement
       ? `${item.fact} So "True" is correct.`
       : `${item.fact} The clue actually points to "${item.correct}", so "False" is correct.`;
+  } else {
+    const easyOrHardStyle = variantFamily % 4;
+    prompt =
+      difficulty === "easy"
+        ? easyOrHardStyle === 0
+            ? interpolateTemplate(
+              promptTemplates.easy[variantIndex % promptTemplates.easy.length],
+              templateValues,
+            )
+          : easyOrHardStyle === 1
+            ? `Which ${category.name.toLowerCase()} answer is best described by this fact? ${sanitizedFact}`
+            : easyOrHardStyle === 2
+              ? `Which answer fits both this clue and fact? ${sanitizedClue} ${sanitizedFact}`
+              : `Classroom note: "${sanitizedClue}" and "${sanitizedFact}" point to which answer?`
+        : easyOrHardStyle === 0
+          ? interpolateTemplate(
+              promptTemplates.hard[variantIndex % promptTemplates.hard.length],
+              templateValues,
+            )
+          : easyOrHardStyle === 1
+            ? `Challenge clue: use both hints to choose the best answer. ${sanitizedClue} ${sanitizedFact}`
+            : easyOrHardStyle === 2
+              ? "Which option keeps the term and description correctly matched?"
+              : `Only one answer truly fits this advanced note about ${category.name.toLowerCase()}: ${sanitizedFact}`;
   }
 
   if (difficulty === "hard") {
-    prompt = `Advanced clue: ${item.fact} Which answer fits best?`;
     explanation = `${item.fact} The strongest answer is "${item.correct}".`;
 
-    if (mediaPreference === "image") {
+    if (variantFamily % 4 === 2) {
+      ({ options, correctAnswer } = buildPairOptions(category, itemIndex, distractors, variantIndex));
+    }
+
+    if (mediaPreference === "image" && variantIndex % 2 === 0) {
       modality = "image";
-      answerType = "single_tap_image";
+      answerType = variantFamily % 4 === 2 ? "multiple_choice" : "single_tap_image";
       mediaUrl = createImageDataUri(item.subject, category.name, tone);
-      mediaAltText = `Illustrated clue card for ${item.subject}`;
+      mediaAltText = `Illustrated clue card for ${item.subject} in ${category.name}`;
       prompt = `Study the clue card and choose the best ${category.name.toLowerCase()} match.`;
     }
 
-    if (mediaPreference === "audio") {
+    if (mediaPreference === "audio" && variantIndex % 2 === 0) {
       modality = "audio";
       mediaUrl = AUDIO_TONE_DATA_URI;
-      mediaAltText = `Short demo audio stinger for ${item.subject}`;
-      prompt = `Listen to the short demo stinger, then use the clue "${item.clue}" to choose the best answer.`;
+      mediaAltText = `Short demo audio stinger for ${item.subject} in ${category.name}`;
+      prompt = `Listen to the short demo stinger, then use the clue "${sanitizedClue}" to choose the best answer.`;
       explanation = `${item.fact} The audio clip is included as a lightweight demo cue.`;
     }
   }
 
-  if (difficulty === "easy" && mediaPreference === "image" && itemIndex % 3 === 0) {
+  if (difficulty === "easy" && mediaPreference === "image" && variantIndex % 5 === 0) {
     modality = "image";
     mediaUrl = createImageDataUri(item.subject, category.name, tone);
-    mediaAltText = `Colorful clue card for ${item.subject}`;
+    mediaAltText = `Colorful clue card for ${item.subject} in ${category.name}`;
     prompt = `Look at the clue card and pick the best answer.`;
   }
 
-  if (difficulty === "easy" && mediaPreference === "audio" && itemIndex % 3 === 0) {
+  if (difficulty === "easy" && mediaPreference === "audio" && variantIndex % 5 === 0) {
     modality = "audio";
     mediaUrl = AUDIO_TONE_DATA_URI;
-    mediaAltText = `Short demo audio stinger for ${item.subject}`;
-    prompt = `Play the short demo stinger, then use the clue "${item.clue}" to choose the best answer.`;
+    mediaAltText = `Short demo audio stinger for ${item.subject} in ${category.name}`;
+    prompt = `Play the short demo stinger, then use the clue "${sanitizedClue}" to choose the best answer.`;
   }
 
-  const ageRange = ageRangeByDifficulty[difficulty];
+  if (difficulty === "medium" && mediaPreference === "image" && variantIndex % 7 === 0) {
+    modality = "image";
+    mediaUrl = createImageDataUri(item.subject, category.name, tone);
+    mediaAltText = `Illustrated medium clue card for ${item.subject} in ${category.name}`;
+  }
+
+  if (difficulty === "medium" && mediaPreference === "audio" && variantIndex % 7 === 0) {
+    modality = "audio";
+    mediaUrl = AUDIO_TONE_DATA_URI;
+    mediaAltText = `Medium audio clue for ${item.subject} in ${category.name}`;
+  }
+
+  const ageRange = resolveAgeRange(difficulty, variantIndex);
 
   return {
-    id: buildQuestionId(categoryIndex + 1, itemIndex + 1, difficultyOrder.indexOf(difficulty) + 1),
+    id: buildQuestionId(categoryIndex + 1, itemIndex + 1, variantIndex + 1),
     categoryId,
-    title: `${category.name} ${difficulty} ${itemIndex + 1}`,
+    title: `${category.name} ${difficulty} ${itemIndex + 1}.${variantIndex + 1}`,
     prompt,
     modality,
     difficulty,
@@ -320,15 +547,15 @@ function buildDifficultyVariant(
     explanation,
     mediaUrl,
     mediaAltText,
-    estimatedSeconds: difficulty === "easy" ? 10 : difficulty === "medium" ? 15 : 20,
+    estimatedSeconds: difficulty === "easy" ? 10 + (variantIndex % 3) : difficulty === "medium" ? 15 + (variantIndex % 4) : 20 + (variantIndex % 5),
     active: true,
-    tags: [category.slug, difficulty, item.subject],
+    tags: [category.slug, difficulty, item.subject, ageRange.min, ageRange.max, modality, `family_${variantFamily % 4}`],
     createdAt: now,
     updatedAt: now,
   } satisfies Question;
 }
 
-export function buildSeedData() {
+export function buildSeedData(options?: { targetQuestionCount?: number }) {
   const categories: Category[] = seedCategories.map((category) => ({
     id: buildCategoryId(seedCategories.findIndex((entry) => entry.slug === category.slug) + 1),
     slug: category.slug,
@@ -337,14 +564,34 @@ export function buildSeedData() {
     active: true,
   }));
 
-  const questions: Question[] = seedCategories.flatMap((category, categoryIndex) => {
+  const totalSeedItems = seedCategories.reduce((total, category) => total + category.items.length, 0);
+  const targetQuestionCount = options?.targetQuestionCount ?? totalSeedItems * difficultyOrder.length;
+  const variantsPerItem = Math.max(1, Math.ceil(targetQuestionCount / totalSeedItems));
+  const questions: Question[] = [];
+
+  for (const [categoryIndex, category] of seedCategories.entries()) {
     const categoryId = buildCategoryId(categoryIndex + 1);
-    return category.items.flatMap((_, itemIndex) =>
-      difficultyOrder.map((difficulty) =>
-        buildDifficultyVariant(category, categoryIndex, categoryId, itemIndex, difficulty),
-      ),
-    );
-  });
+
+    for (const [itemIndex] of category.items.entries()) {
+      for (let variantIndex = 0; variantIndex < variantsPerItem; variantIndex += 1) {
+        if (questions.length >= targetQuestionCount) {
+          break;
+        }
+
+        const difficulty = difficultyOrder[variantIndex % difficultyOrder.length];
+        questions.push(
+          buildDifficultyVariant(
+            category,
+            categoryIndex,
+            categoryId,
+            itemIndex,
+            difficulty,
+            variantIndex,
+          ),
+        );
+      }
+    }
+  }
 
   return {
     categories,

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = createRoom({
+    const result = await createRoom({
       hostName: parsed.data.hostName,
       config: {
         numberOfRounds: parsed.data.numberOfRounds,
