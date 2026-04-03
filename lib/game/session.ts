@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 function sessionCookieName(roomCode: string) {
-  return `kids_quiz_${roomCode.toLowerCase()}`.replace(/[^a-z0-9_]/g, "_");
+  return `witzy_${roomCode.toLowerCase()}`.replace(/[^a-z0-9_]/g, "_");
 }
 
 export async function getRoomSessionKey(roomCode: string) {

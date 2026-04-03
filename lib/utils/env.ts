@@ -27,7 +27,11 @@ export const env = {
     (parsedEnvironment.data.NODE_ENV === "production"
       ? ""
       : "dev-session-secret-for-local-builds"),
-  NEXT_PUBLIC_APP_URL: parsedEnvironment.data.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  NEXT_PUBLIC_APP_URL:
+    parsedEnvironment.data.NEXT_PUBLIC_APP_URL ??
+    (parsedEnvironment.data.NODE_ENV === "production"
+      ? "https://witzy.sureka.family"
+      : "http://localhost:3000"),
 };
 
 export function requireDatabaseUrl() {

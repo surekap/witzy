@@ -148,7 +148,7 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/" style={{ textDecoration: "none" }}>
-              <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
+              <Image src="/media/logo.png" alt="Witzy" width={32} height={32} className="rounded-lg" unoptimized />
             </Link>
             <div>
               <p className="section-eyebrow">

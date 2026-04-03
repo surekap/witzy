@@ -24,8 +24,8 @@ const pathways = [
   },
   {
     number: "03",
-    title: "Solo practice",
-    description: "Test the question engine with a 10-question adaptive practice run.",
+    title: "Practice mode",
+    description: "Play a 10-question solo run with adaptive difficulty and instant feedback.",
     href: "/solo",
     cardClass: "pathway-card pathway-card-warm",
     numColor: "var(--warm-deep)",
@@ -41,7 +41,7 @@ export default function HomePage() {
         <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <Image
             src="/media/logo.png"
-            alt="Kids Quiz Live logo"
+            alt="Witzy logo"
             width={36}
             height={36}
             className="rounded-lg"
@@ -56,7 +56,7 @@ export default function HomePage() {
               letterSpacing: "-0.01em",
             }}
           >
-            Kids Quiz Live
+            Witzy
           </span>
         </Link>
         <Link href="/join" className="btn btn-secondary btn-sm">
@@ -66,7 +66,7 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section className="space-y-6 py-4">
-        <p className="section-eyebrow">Live multiplayer quiz</p>
+        <p className="section-eyebrow">Live multiplayer quiz and solo practice</p>
         <h1
           style={{
             fontFamily: "var(--font-display)",
@@ -93,7 +93,7 @@ export default function HomePage() {
           }}
         >
           Kids answer simultaneously on their own devices. Everyone gets the same category
-          — but each question is tuned to their level.
+          — but each question is tuned to their level. Or jump into practice mode for a quick solo session.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <Link className={primaryButtonClass} href="/host">
@@ -101,6 +101,9 @@ export default function HomePage() {
           </Link>
           <Link className={secondaryButtonClass} href="/join">
             Join a room
+          </Link>
+          <Link className={secondaryButtonClass} href="/solo">
+            Practice solo
           </Link>
         </div>
       </section>
@@ -172,6 +175,10 @@ export default function HomePage() {
           {
             label: "Media ready",
             text: "Text, image, and audio questions all work inside the same round loop.",
+          },
+          {
+            label: "Practice mode",
+            text: "Solo players can warm up with adaptive questions and instant answer explanations.",
           },
         ].map(({ label, text }) => (
           <div key={label} className="feature-callout">

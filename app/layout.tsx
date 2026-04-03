@@ -16,8 +16,10 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Kids Quiz Live",
-  description: "A playful multiplayer family quiz app with synchronized live rounds and personalized questions.",
+  metadataBase: new URL("https://witzy.sureka.family"),
+  title: "Witzy",
+  description:
+    "Witzy is a playful family quiz app with live multiplayer rounds and a solo practice mode.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

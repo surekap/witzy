@@ -21,6 +21,16 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
   const [submitted, setSubmitted] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const hasStarted = askedIds.length > 0 || current !== null;
+
+  const resetSession = () => {
+    setAskedIds([]);
+    setCurrent(null);
+    setSelectedAnswer(null);
+    setSubmitted(false);
+    setCorrectCount(0);
+    setError(null);
+  };
 
   const fetchQuestion = async () => {
     setError(null);
@@ -62,10 +72,10 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
       {/* ── Page header ── */}
       <header className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
+          <Image src="/media/logo.png" alt="Witzy" width={32} height={32} className="rounded-lg" unoptimized />
         </Link>
         <div>
-          <p className="section-eyebrow">Solo practice</p>
+          <p className="section-eyebrow">Practice mode</p>
           <h1
             style={{
               fontFamily: "var(--font-display)",
@@ -76,7 +86,7 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
               color: "var(--ink)",
             }}
           >
-            Test the question engine
+            Practice on your own
           </h1>
         </div>
       </header>
@@ -87,7 +97,7 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
           <div>
             <p className="section-eyebrow">Settings</p>
             <h2 className="section-title" style={{ fontSize: "1.1875rem" }}>
-              10-question adaptive session
+              10-question solo session
             </h2>
           </div>
           {askedIds.length > 0 ? (
@@ -129,7 +139,10 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
             <select
               className="form-input mt-1"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                resetSession();
+              }}
             >
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
@@ -144,9 +157,10 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
             <select
               className="form-input mt-1"
               value={ageBand}
-              onChange={(e) =>
-                setAgeBand(e.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus")
-              }
+              onChange={(e) => {
+                setAgeBand(e.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus");
+                resetSession();
+              }}
             >
               <option value="6_to_8">6 – 8 years</option>
               <option value="9_to_11">9 – 11 years</option>
@@ -156,19 +170,25 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
           </label>
 
           <div className="flex items-end">
-            <button
-              className={primaryButtonClass}
-              disabled={isComplete}
-              onClick={() => startTransition(() => void fetchQuestion())}
-              type="button"
-              style={{ width: "100%" }}
-            >
-              {isComplete
-                ? "Practice complete"
-                : current
-                  ? "Next question →"
-                  : "Start practice"}
-            </button>
+            {hasStarted ? (
+              <button
+                className={secondaryButtonClass}
+                onClick={resetSession}
+                type="button"
+                style={{ width: "100%" }}
+              >
+                Start over
+              </button>
+            ) : (
+              <button
+                className={primaryButtonClass}
+                onClick={() => startTransition(() => void fetchQuestion())}
+                type="button"
+                style={{ width: "100%" }}
+              >
+                Start practice
+              </button>
+            )}
           </div>
         </div>
 
@@ -312,7 +332,7 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
                 onClick={() => startTransition(() => void fetchQuestion())}
                 type="button"
               >
-                Next question →
+                Continue →
               </button>
             ) : null}
           </div>
@@ -391,7 +411,7 @@ export function SoloPractice({ categories }: { categories: Category[] }) {
           </p>
           <div className="flex flex-wrap justify-center gap-3 mt-5">
             <Link className={primaryButtonClass} href="/solo">
-              Try again
+              Play again
             </Link>
             <Link className={secondaryButtonClass} href="/">
               Back home

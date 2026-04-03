@@ -60,7 +60,7 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
       {/* ── Page header ── */}
       <header className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <Image src="/media/logo.png" alt="Kids Quiz Live" width={32} height={32} className="rounded-lg" unoptimized />
+          <Image src="/media/logo.png" alt="Witzy" width={32} height={32} className="rounded-lg" unoptimized />
         </Link>
         <div>
           <p className="section-eyebrow">Join a room</p>
