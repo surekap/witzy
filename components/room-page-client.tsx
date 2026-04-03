@@ -707,6 +707,9 @@ function PlayerQuestionPanel({
     (playerQuestion.confidenceMode as "safe" | "bold" | null) ?? "safe",
   );
   const [hintRequested, setHintRequested] = useState(playerQuestion.hintUsed);
+  const [isFlaggingQuestion, setIsFlaggingQuestion] = useState(false);
+  const [hasFlaggedQuestion, setHasFlaggedQuestion] = useState(false);
+  const [flagMessage, setFlagMessage] = useState<string | null>(null);
 
   const hiddenKeys = hintRequested ? playerQuestion.hintRemoves : [];
   const options = (Object.entries(playerQuestion.options) as Array<[AnswerKey, string]>).filter(
@@ -815,6 +818,55 @@ function PlayerQuestionPanel({
       >
         {playerQuestion.locked ? "Answer locked ✓" : "Lock in answer"}
       </button>
+
+      <button
+        className={secondaryButtonClass}
+        disabled={isFlaggingQuestion || hasFlaggedQuestion}
+        onClick={() =>
+          startTransition(async () => {
+            setFlagMessage(null);
+            setIsFlaggingQuestion(true);
+
+            try {
+              const response = await fetch(`/api/rooms/${roomCode}/flags`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  assignedQuestionId: playerQuestion.assignedQuestionId,
+                }),
+              });
+              const payload = (await response.json()) as { alreadyFlagged?: boolean; error?: string };
+
+              if (!response.ok) {
+                setFlagMessage(payload.error ?? "Couldn't flag that question.");
+                return;
+              }
+
+              setHasFlaggedQuestion(true);
+              setFlagMessage(
+                payload.alreadyFlagged
+                  ? "You already flagged this question."
+                  : "Thanks. We logged this question for review.",
+              );
+            } finally {
+              setIsFlaggingQuestion(false);
+            }
+          })
+        }
+        type="button"
+      >
+        {hasFlaggedQuestion
+          ? "Flagged for review"
+          : isFlaggingQuestion
+            ? "Flagging..."
+            : "Flag as incorrect"}
+      </button>
+
+      {flagMessage ? (
+        <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+          {flagMessage}
+        </p>
+      ) : null}
     </div>
   );
 }

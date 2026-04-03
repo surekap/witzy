@@ -5,6 +5,7 @@ import {
   loadRoomStateFromDatabase,
   updateRoomStateInDatabase,
 } from "@/lib/db/runtime-storage";
+import { recordQuestionFlag } from "@/lib/question-flags/service";
 import { scoreRoundAnswers } from "@/lib/scoring/score-round";
 import { getStore } from "@/lib/game/store";
 import { env } from "@/lib/utils/env";
@@ -670,6 +671,50 @@ function getLeaderboardInMemory(roomCode: string) {
   return sortLeaderboard(room.players);
 }
 
+async function flagRoomQuestionInMemory(
+  roomCode: string,
+  sessionKey: string | null,
+  input: {
+    assignedQuestionId: string;
+  },
+) {
+  const room = getRoomOrThrow(roomCode);
+  synchronizeRound(room);
+  const player = getPlayerBySession(room, sessionKey);
+  const currentRound = getCurrentRound(room);
+
+  if (!currentRound) {
+    throw new GameError("There isn't an active question to flag right now.", 404);
+  }
+
+  const assignment = currentRound.assignments.find(
+    (candidate) =>
+      candidate.id === input.assignedQuestionId && candidate.gamePlayerId === player.id,
+  );
+
+  if (!assignment) {
+    throw new GameError("You can only flag the question assigned to you.", 403);
+  }
+
+  const result = await recordQuestionFlag({
+    questionId: assignment.questionId,
+    questionTitle: assignment.questionSnapshot.title,
+    questionPrompt: assignment.questionSnapshot.prompt,
+    reporterKey: `room:${room.roomCode}:${player.id}`,
+    reporterScope: "room_player",
+    reporterUserId: null,
+    reporterDisplayName: player.displayName,
+    source: "live_room",
+    roomCode: room.roomCode,
+  });
+
+  return {
+    questionId: assignment.questionId,
+    alreadyFlagged: result.alreadyFlagged,
+    summary: result.summary,
+  };
+}
+
 function getSoloQuestionInMemory(input: {
   categoryId: string;
   ageBand: AgeBand;
@@ -887,6 +932,23 @@ export async function getLeaderboard(roomCode: string) {
   }
 
   return withPersistedRoom(roomCode, () => getLeaderboardInMemory(roomCode));
+}
+
+export async function flagRoomQuestion(
+  roomCode: string,
+  sessionKey: string | null,
+  input: {
+    assignedQuestionId: string;
+  },
+) {
+  if (env.NODE_ENV === "test") {
+    return flagRoomQuestionInMemory(roomCode, sessionKey, input);
+  }
+
+  const { result } = await withScratchStore({ roomCode }, () =>
+    flagRoomQuestionInMemory(roomCode, sessionKey, input),
+  );
+  return result;
 }
 
 export async function getSoloQuestion(input: {

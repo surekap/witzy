@@ -66,3 +66,11 @@ export const soloAnswerSchema = z.object({
   questionId: z.string().trim().min(1),
   answerKey: z.union([z.literal("A"), z.literal("B"), z.literal("C"), z.literal("D")]),
 });
+
+export const soloQuestionFlagSchema = z.object({
+  questionId: z.string().trim().min(1),
+});
+
+export const roomQuestionFlagSchema = z.object({
+  assignedQuestionId: z.string().trim().min(1),
+});

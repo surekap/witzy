@@ -3,6 +3,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { createNeonSql } from "@/lib/db/neon";
 import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
 import { isQuestionAgeCompatible, resolvePlayerDifficulty } from "@/lib/questions/assignment";
+import { recordQuestionFlag } from "@/lib/question-flags/service";
 import { getStore } from "@/lib/game/store";
 import { createId } from "@/lib/utils/ids";
 import { getPracticeStore } from "@/lib/practice/store";
@@ -764,5 +765,68 @@ export async function submitPracticeAnswer(
     correctAnswerText: question.options[question.correctAnswer] ?? "Correct answer",
     explanation: question.explanation,
     lifetimeProgress: buildLifetimeProgress(updatedAccount.progress, questions, categories),
+  };
+}
+
+export async function flagPracticeQuestion(
+  accountId: string,
+  input: {
+    questionId: string;
+  },
+  store = getPracticeStore(),
+) {
+  if (env.NODE_ENV !== "test") {
+    const snapshot = await loadRuntimeAccountSnapshot(accountId);
+    if (!snapshot) {
+      throw new PracticeError("Please sign in again to continue practice.", 401);
+    }
+
+    const question = snapshot.questions.find((candidate) => candidate.id === input.questionId);
+    if (!question) {
+      throw new PracticeError("That practice question could not be found.", 404);
+    }
+
+    const result = await recordQuestionFlag({
+      questionId: question.id,
+      questionTitle: question.title,
+      questionPrompt: question.prompt,
+      reporterKey: `practice:${snapshot.account.id}`,
+      reporterScope: "practice_account",
+      reporterUserId: snapshot.account.id,
+      reporterDisplayName: snapshot.account.username,
+      source: "solo_practice",
+      roomCode: null,
+    });
+
+    return {
+      questionId: question.id,
+      alreadyFlagged: result.alreadyFlagged,
+      summary: result.summary,
+    };
+  }
+
+  const account = await getAccountOrThrow(accountId, store);
+  const question = getStore().questions.find((candidate) => candidate.id === input.questionId);
+
+  if (!question) {
+    throw new PracticeError("That practice question could not be found.", 404);
+  }
+
+  const result = await recordQuestionFlag({
+    questionId: question.id,
+    questionTitle: question.title,
+    questionPrompt: question.prompt,
+    reporterKey: `practice:${account.id}`,
+    reporterScope: "practice_account",
+    reporterUserId: account.id,
+    reporterDisplayName: account.username,
+    source: "solo_practice",
+    roomCode: null,
+  });
+
+  return {
+    questionId: question.id,
+    alreadyFlagged: result.alreadyFlagged,
+    summary: result.summary,
   };
 }

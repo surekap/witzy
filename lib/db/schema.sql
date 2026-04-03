@@ -142,5 +142,21 @@ create table if not exists practice_question_attempts (
   answered_at timestamptz not null default now()
 );
 
+create table if not exists question_flags (
+  id uuid primary key default gen_random_uuid(),
+  question_id uuid not null references questions(id) on delete cascade,
+  question_title text not null,
+  question_prompt text not null,
+  reporter_key text not null,
+  reporter_scope text not null,
+  reporter_user_id uuid references users(id) on delete set null,
+  reporter_display_name text not null,
+  source text not null,
+  room_code text,
+  reported_at timestamptz not null default now()
+);
+
 create index if not exists idx_practice_attempts_user on practice_question_attempts(user_id, answered_at desc);
 create index if not exists idx_practice_attempts_question on practice_question_attempts(question_id);
+create index if not exists idx_question_flags_question on question_flags(question_id, reported_at desc);
+create unique index if not exists idx_question_flags_question_reporter on question_flags(question_id, reporter_key);

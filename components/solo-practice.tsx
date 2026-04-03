@@ -24,6 +24,11 @@ interface SoloAnswerPayload {
   lifetimeProgress: PracticeLifetimeProgress;
 }
 
+interface SoloFlagPayload {
+  questionId: string;
+  alreadyFlagged: boolean;
+}
+
 function formatPercent(rate: number) {
   return `${Math.round(rate * 100)}%`;
 }
@@ -52,8 +57,11 @@ export function SoloPractice({
   const [password, setPassword] = useState("");
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
   const [isSavingAnswer, setIsSavingAnswer] = useState(false);
+  const [isFlaggingQuestion, setIsFlaggingQuestion] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [flaggedQuestionIds, setFlaggedQuestionIds] = useState<string[]>([]);
+  const [flagMessage, setFlagMessage] = useState<string | null>(null);
   const hasStarted = askedIds.length > 0 || current !== null;
 
   const resetSession = () => {
@@ -64,6 +72,7 @@ export function SoloPractice({
     setResult(null);
     setCorrectCount(0);
     setError(null);
+    setFlagMessage(null);
   };
 
   const handleAuth = async (path: "/api/account/register" | "/api/account/login") => {
@@ -141,6 +150,7 @@ export function SoloPractice({
       setSelectedAnswer(null);
       setSubmitted(false);
       setResult(null);
+      setFlagMessage(null);
       setAskedIds((ids) => [...ids, payload.question.id]);
     } finally {
       setIsLoadingQuestion(false);
@@ -176,10 +186,47 @@ export function SoloPractice({
       setLifetimeProgress(payload.lifetimeProgress);
 
       if (payload.isCorrect) {
-        setCorrectCount((count) => count + 1);
+      setCorrectCount((count) => count + 1);
       }
     } finally {
       setIsSavingAnswer(false);
+    }
+  };
+
+  const flagQuestion = async () => {
+    if (!current) {
+      return;
+    }
+
+    setError(null);
+    setFlagMessage(null);
+    setIsFlaggingQuestion(true);
+
+    try {
+      const response = await fetch("/api/solo/flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId: current.question.id,
+        }),
+      });
+      const payload = (await response.json()) as SoloFlagPayload & { error?: string };
+
+      if (!response.ok) {
+        setError(payload.error ?? "Couldn't flag that question.");
+        return;
+      }
+
+      setFlaggedQuestionIds((questionIds) =>
+        questionIds.includes(payload.questionId) ? questionIds : [...questionIds, payload.questionId],
+      );
+      setFlagMessage(
+        payload.alreadyFlagged
+          ? "You already flagged this question."
+          : "Thanks. We logged this question for review.",
+      );
+    } finally {
+      setIsFlaggingQuestion(false);
     }
   };
 
@@ -187,6 +234,7 @@ export function SoloPractice({
   const isComplete = askedIds.length >= 10 && submitted;
   const isCorrect = submitted && result?.isCorrect;
   const canStartPractice = Boolean(account && categoryId);
+  const currentQuestionAlreadyFlagged = current ? flaggedQuestionIds.includes(current.question.id) : false;
 
   return (
     <div className="space-y-8">
@@ -587,6 +635,18 @@ export function SoloPractice({
             >
               {isSavingAnswer ? "Saving..." : "Lock answer"}
             </button>
+            <button
+              className={secondaryButtonClass}
+              disabled={!current || isFlaggingQuestion || currentQuestionAlreadyFlagged}
+              onClick={() => startTransition(() => void flagQuestion())}
+              type="button"
+            >
+              {currentQuestionAlreadyFlagged
+                ? "Flagged for review"
+                : isFlaggingQuestion
+                  ? "Flagging..."
+                  : "Flag as incorrect"}
+            </button>
             {submitted && !isComplete ? (
               <button
                 className={secondaryButtonClass}
@@ -598,6 +658,11 @@ export function SoloPractice({
               </button>
             ) : null}
           </div>
+          {flagMessage ? (
+            <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+              {flagMessage}
+            </p>
+          ) : null}
 
           {submitted && result ? (
             <div
