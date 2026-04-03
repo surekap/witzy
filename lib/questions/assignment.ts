@@ -57,7 +57,10 @@ export function assignQuestionForPlayer(params: {
   usedQuestionIds: Set<string>;
 }) {
   const categoryQuestions = params.questions.filter(
-    (question) => question.categoryId === params.categoryId && question.active,
+    (question) =>
+      question.categoryId === params.categoryId &&
+      question.active &&
+      isQuestionAgeCompatible(question, params.ageBand),
   );
 
   const adjacentDifficulties = buildDifficultyRelaxation(params.targetDifficulty);
@@ -78,33 +81,13 @@ export function assignQuestionForPlayer(params: {
       return exactDifficulty[0];
     }
 
-    const relaxedAge = sortQuestions(
-      questionPool.filter((question) => question.difficulty === params.targetDifficulty),
-    );
-    if (relaxedAge.length > 0) {
-      return relaxedAge[0];
-    }
-
     for (const difficulty of adjacentDifficulties) {
       const nearbyAgeMatch = sortQuestions(
-        questionPool.filter(
-          (question) =>
-            question.difficulty === difficulty && isQuestionAgeCompatible(question, params.ageBand),
-        ),
+        questionPool.filter((question) => question.difficulty === difficulty),
       );
 
       if (nearbyAgeMatch.length > 0) {
         return nearbyAgeMatch[0];
-      }
-    }
-
-    for (const difficulty of adjacentDifficulties) {
-      const nearbyDifficulty = sortQuestions(
-        questionPool.filter((question) => question.difficulty === difficulty),
-      );
-
-      if (nearbyDifficulty.length > 0) {
-        return nearbyDifficulty[0];
       }
     }
 

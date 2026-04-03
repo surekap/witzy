@@ -255,18 +255,16 @@ export function selectPracticeQuestionForAccount(params: {
     (question) =>
       question.categoryId === params.category.id &&
       question.active &&
+      isQuestionAgeCompatible(question, params.ageBand) &&
       !askedQuestionIds.has(question.id) &&
       !masteredQuestionIds.has(question.id),
   );
 
   const difficultyPreference = getDifficultyFallbacks(params.targetDifficulty);
 
-  const buckets = difficultyPreference.flatMap((difficulty) => [
-    categoryQuestions.filter(
-      (question) => question.difficulty === difficulty && isQuestionAgeCompatible(question, params.ageBand),
-    ),
+  const buckets = difficultyPreference.map((difficulty) =>
     categoryQuestions.filter((question) => question.difficulty === difficulty),
-  ]);
+  );
 
   for (const bucket of buckets) {
     if (bucket.length === 0) {
