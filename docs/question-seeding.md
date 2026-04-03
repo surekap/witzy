@@ -5,11 +5,11 @@
 Witzy supports two question-bank workflows:
 
 1. `corepack pnpm seed`
-   This generates the built-in synthetic quiz bank and writes it into Neon.
+   This generates the built-in synthetic quiz bank and uploads it into Convex.
 2. `corepack pnpm import:questions <path-to-json>`
-   This loads a JSON file that was created elsewhere and replaces the current `categories` and `questions` tables with that content.
+   This loads a JSON file that was created elsewhere and activates a fresh question-bank version in Convex.
 
-Both commands require `DATABASE_URL` in `.env.local` or `.env`.
+Both commands require `NEXT_PUBLIC_CONVEX_URL` and `CONVEX_ADMIN_KEY` in `.env.local` or `.env`.
 
 ## What The Import Command Does
 
@@ -21,7 +21,8 @@ The importer:
 - validates its shape with `zod`
 - generates UUIDs automatically when category or question IDs are omitted
 - maps each question's `categorySlug` to the correct category row
-- replaces the current question bank in Neon
+- uploads a fresh bank version into Convex
+- switches the app to the new bank only after the full upload finishes
 
 The importer is intentionally strict. It will fail if:
 

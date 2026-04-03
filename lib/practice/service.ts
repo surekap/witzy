@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-import { createNeonSql } from "@/lib/db/neon";
+import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
 import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
 import { isQuestionAgeCompatible, resolvePlayerDifficulty } from "@/lib/questions/assignment";
 import { recordQuestionFlag } from "@/lib/question-flags/service";
@@ -41,18 +41,18 @@ type PracticeStore = ReturnType<typeof getPracticeStore>;
 type PracticeUserRow = {
   id: string;
   username: string;
-  display_name: string;
-  password_hash: string | null;
-  password_salt: string | null;
-  created_at: string;
-  last_login_at: string | null;
+  displayName: string;
+  passwordHash: string | null;
+  passwordSalt: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
 };
 
 type PracticeAttemptRow = {
-  question_id: string;
-  submitted_answer: string;
-  is_correct: boolean;
-  answered_at: string;
+  questionId: string;
+  submittedAnswer: string;
+  isCorrect: boolean;
+  answeredAt: string;
 };
 
 function normalizeUsername(username: string) {
@@ -313,11 +313,11 @@ function buildProgressFromAttempts(
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
 
   const sortedAttempts = [...attempts].sort(
-    (left, right) => new Date(left.answered_at).getTime() - new Date(right.answered_at).getTime(),
+    (left, right) => new Date(left.answeredAt).getTime() - new Date(right.answeredAt).getTime(),
   );
 
   for (const attempt of sortedAttempts) {
-    const question = questionsById.get(attempt.question_id);
+    const question = questionsById.get(attempt.questionId);
     if (!question) {
       continue;
     }
@@ -327,12 +327,12 @@ function buildProgressFromAttempts(
       continue;
     }
 
-    const isCorrect = attempt.is_correct;
+    const isCorrect = attempt.isCorrect;
     const questionStats = getQuestionStats(progress, question.id);
     progress.questionStats[question.id] = {
       correctCount: questionStats.correctCount + (isCorrect ? 1 : 0),
       incorrectCount: questionStats.incorrectCount + (isCorrect ? 0 : 1),
-      lastAnsweredAt: attempt.answered_at,
+      lastAnsweredAt: attempt.answeredAt,
     };
     progress.totalAnswered += 1;
     progress.totalCorrect += isCorrect ? 1 : 0;
@@ -364,38 +364,21 @@ function buildProgressFromAttempts(
 }
 
 async function loadRuntimeAccountById(accountId: string) {
-  const sql = createNeonSql();
-  const rows = await (sql.query(
-    `select id, username, display_name, password_hash, password_salt, created_at::text, last_login_at::text
-      from users
-      where id = $1 and username is not null`,
-    [accountId],
-  ) as unknown as Promise<PracticeUserRow[]>);
-
-  return rows[0] ?? null;
+  return runConvexQuery<{ accountId: string }, PracticeUserRow | null>("practice:getAccountById", {
+    accountId,
+  });
 }
 
 async function loadRuntimeAccountByUsername(username: string) {
-  const sql = createNeonSql();
-  const rows = await (sql.query(
-    `select id, username, display_name, password_hash, password_salt, created_at::text, last_login_at::text
-      from users
-      where lower(username) = lower($1)`,
-    [username],
-  ) as unknown as Promise<PracticeUserRow[]>);
-
-  return rows[0] ?? null;
+  return runConvexQuery<{ username: string }, PracticeUserRow | null>("practice:getAccountByUsername", {
+    username,
+  });
 }
 
 async function loadRuntimeAttempts(accountId: string) {
-  const sql = createNeonSql();
-  return sql.query(
-    `select question_id, submitted_answer, is_correct, answered_at::text
-      from practice_question_attempts
-      where user_id = $1
-      order by answered_at asc`,
-    [accountId],
-  ) as unknown as Promise<PracticeAttemptRow[]>;
+  return runConvexQuery<{ accountId: string }, PracticeAttemptRow[]>("practice:listAttemptsByAccountId", {
+    accountId,
+  });
 }
 
 async function loadRuntimeAccountSnapshot(accountId: string) {
@@ -421,8 +404,8 @@ function toRuntimeAccountProfile(snapshot: NonNullable<Awaited<ReturnType<typeof
   return {
     id: snapshot.account.id,
     username: snapshot.account.username,
-    createdAt: snapshot.account.created_at,
-    lastLoginAt: snapshot.account.last_login_at,
+    createdAt: snapshot.account.createdAt,
+    lastLoginAt: snapshot.account.lastLoginAt,
     lifetimeProgress: buildLifetimeProgress(snapshot.progress, snapshot.questions, snapshot.categories),
   } satisfies PracticeAccountProfile;
 }
@@ -440,36 +423,38 @@ export async function registerPracticeAccount(input: { username: string; passwor
   }
 
   if (env.NODE_ENV !== "test") {
-    const sql = createNeonSql();
     const passwordSalt = randomBytes(16).toString("hex");
     const passwordHash = hashPassword(password, passwordSalt);
     const timestamp = new Date().toISOString();
 
     try {
-      const rows = await (sql.query(
-        `insert into users (
-          display_name,
-          username,
-          password_hash,
-          password_salt,
-          created_at,
-          last_login_at
-        ) values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
-        returning id, username, display_name, password_hash, password_salt, created_at::text, last_login_at::text`,
-        [username, username, passwordHash, passwordSalt, timestamp, timestamp],
-      ) as unknown as Promise<PracticeUserRow[]>);
-
-      const account = rows[0];
-      if (!account) {
-        throw new PracticeError("Could not create that account.", 500);
-      }
+      const account = await runConvexMutation<
+        {
+          accountId: string;
+          username: string;
+          displayName: string;
+          passwordHash: string;
+          passwordSalt: string;
+          createdAt: string;
+          lastLoginAt: string;
+        },
+        PracticeUserRow
+      >("practice:createAccount", {
+        accountId: createId("practice_user"),
+        username,
+        displayName: username,
+        passwordHash,
+        passwordSalt,
+        createdAt: timestamp,
+        lastLoginAt: timestamp,
+      });
 
       const { categories, questions } = await loadQuestionBankFromDatabase();
       return {
         id: account.id,
         username: account.username,
-        createdAt: account.created_at,
-        lastLoginAt: account.last_login_at,
+        createdAt: account.createdAt,
+        lastLoginAt: account.lastLoginAt,
         lifetimeProgress: buildLifetimeProgress(
           {
             totalAnswered: 0,
@@ -516,17 +501,17 @@ export async function loginPracticeAccount(input: { username: string; password: 
   if (env.NODE_ENV !== "test") {
     const account = await loadRuntimeAccountByUsername(username);
 
-    if (!account || !account.password_hash || !account.password_salt) {
+    if (!account || !account.passwordHash || !account.passwordSalt) {
       throw new PracticeError("That username and password did not match.", 401);
     }
 
     const runtimeAccount: PracticeAccountRecord = {
       id: account.id,
       username: account.username,
-      passwordHash: account.password_hash,
-      passwordSalt: account.password_salt,
-      createdAt: account.created_at,
-      lastLoginAt: account.last_login_at,
+      passwordHash: account.passwordHash,
+      passwordSalt: account.passwordSalt,
+      createdAt: account.createdAt,
+      lastLoginAt: account.lastLoginAt,
       progress: {
         totalAnswered: 0,
         totalCorrect: 0,
@@ -542,16 +527,18 @@ export async function loginPracticeAccount(input: { username: string; password: 
       throw new PracticeError("That username and password did not match.", 401);
     }
 
-    const sql = createNeonSql();
     const lastLoginAt = new Date().toISOString();
-    await sql.query("update users set last_login_at = $2::timestamptz where id = $1", [account.id, lastLoginAt]);
+    await runConvexMutation<{ accountId: string; lastLoginAt: string }, PracticeUserRow | null>(
+      "practice:updateLastLoginAt",
+      { accountId: account.id, lastLoginAt },
+    );
     const snapshot = await loadRuntimeAccountSnapshot(account.id);
 
     if (!snapshot) {
       throw new PracticeError("Please sign in again to continue practice.", 401);
     }
 
-    snapshot.account.last_login_at = lastLoginAt;
+    snapshot.account.lastLoginAt = lastLoginAt;
     return toRuntimeAccountProfile(snapshot);
   }
 
@@ -687,12 +674,22 @@ export async function submitPracticeAnswer(
     }
 
     const isCorrect = question.correctAnswer === input.answerKey;
-    const sql = createNeonSql();
-    await sql.query(
-      `insert into practice_question_attempts (user_id, question_id, submitted_answer, is_correct)
-        values ($1, $2, $3, $4)`,
-      [accountId, question.id, input.answerKey, isCorrect],
-    );
+    await runConvexMutation<
+      {
+        accountId: string;
+        questionId: string;
+        submittedAnswer: string;
+        isCorrect: boolean;
+        answeredAt: string;
+      },
+      { saved: boolean }
+    >("practice:insertPracticeAttempt", {
+      accountId,
+      questionId: question.id,
+      submittedAnswer: input.answerKey,
+      isCorrect,
+      answeredAt: new Date().toISOString(),
+    });
 
     const refreshedSnapshot = await loadRuntimeAccountSnapshot(accountId);
     if (!refreshedSnapshot) {

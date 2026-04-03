@@ -16,22 +16,18 @@ async function main() {
   const rawContents = await fs.readFile(resolvedPath, "utf8");
   const payload = JSON.parse(rawContents) as unknown;
 
-  const [{ createNeonSql }, { replaceQuestionBank }, { normalizeImportedQuestionBank }, { env }] =
-    await Promise.all([
-      import("@/lib/db/neon"),
-      import("@/lib/db/question-bank"),
-      import("@/lib/questions/import-format"),
-      import("@/lib/utils/env"),
-    ]);
+  const [{ replaceQuestionBank }, { normalizeImportedQuestionBank }, { env }] = await Promise.all([
+    import("@/lib/db/question-bank"),
+    import("@/lib/questions/import-format"),
+    import("@/lib/utils/env"),
+  ]);
 
-  if (!env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to import questions into Neon.");
+  if (!env.NEXT_PUBLIC_CONVEX_URL) {
+    throw new Error("NEXT_PUBLIC_CONVEX_URL is required to import questions into Convex.");
   }
 
   const questionBank = normalizeImportedQuestionBank(payload);
-  const sql = createNeonSql();
-
-  await replaceQuestionBank(sql, questionBank);
+  await replaceQuestionBank(questionBank);
 
   console.log(
     `Imported ${questionBank.categories.length} categories and ${questionBank.questions.length} questions from ${resolvedPath}.`,

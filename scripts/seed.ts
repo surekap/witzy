@@ -6,8 +6,7 @@ import { loadLocalEnv } from "./load-env";
 loadLocalEnv();
 
 async function main() {
-  const [{ createNeonSql }, { replaceQuestionBank }, { buildSeedData }, { env }] = await Promise.all([
-    import("@/lib/db/neon"),
+  const [{ replaceQuestionBank }, { buildSeedData }, { env }] = await Promise.all([
     import("@/lib/db/question-bank"),
     import("@/lib/questions/seed-data"),
     import("@/lib/utils/env"),
@@ -15,7 +14,7 @@ async function main() {
   const targetQuestionCount = 5000;
   const { categories, questions } = buildSeedData({ targetQuestionCount });
 
-  if (!env.DATABASE_URL) {
+  if (!env.NEXT_PUBLIC_CONVEX_URL) {
     const previewPath = path.join(process.cwd(), "scripts", "seed-preview.json");
     await fs.writeFile(
       previewPath,
@@ -31,14 +30,13 @@ async function main() {
       ),
     );
 
-    console.log(`No DATABASE_URL found. Wrote seed preview to ${previewPath}`);
+    console.log(`No Convex runtime env found. Wrote seed preview to ${previewPath}`);
     return;
   }
 
-  const sql = createNeonSql();
-  await replaceQuestionBank(sql, { categories, questions });
+  await replaceQuestionBank({ categories, questions });
 
-  console.log(`Seeded ${categories.length} categories and ${questions.length} questions into Neon.`);
+  console.log(`Seeded ${categories.length} categories and ${questions.length} questions into Convex.`);
 }
 
 main().catch((error) => {

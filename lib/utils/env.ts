@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 const environmentSchema = z.object({
-  DATABASE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_CONVEX_URL: z.string().url().optional(),
+  CONVEX_ADMIN_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   SESSION_SECRET: z.string().min(16).optional(),
   MEDIA_BASE_URL: z.string().url().optional(),
@@ -9,7 +10,8 @@ const environmentSchema = z.object({
 });
 
 const parsedEnvironment = environmentSchema.safeParse({
-  DATABASE_URL: process.env.DATABASE_URL,
+  NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
+  CONVEX_ADMIN_KEY: process.env.CONVEX_ADMIN_KEY,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   SESSION_SECRET: process.env.SESSION_SECRET,
   MEDIA_BASE_URL: process.env.MEDIA_BASE_URL,
@@ -34,10 +36,18 @@ export const env = {
       : "http://localhost:3000"),
 };
 
-export function requireDatabaseUrl() {
-  if (!env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required for Neon operations.");
+export function requireConvexUrl() {
+  if (!env.NEXT_PUBLIC_CONVEX_URL) {
+    throw new Error("NEXT_PUBLIC_CONVEX_URL is required for Convex operations.");
   }
 
-  return env.DATABASE_URL;
+  return env.NEXT_PUBLIC_CONVEX_URL;
+}
+
+export function requireConvexAdminKey() {
+  if (!env.CONVEX_ADMIN_KEY) {
+    throw new Error("CONVEX_ADMIN_KEY is required for server-side Convex operations.");
+  }
+
+  return env.CONVEX_ADMIN_KEY;
 }

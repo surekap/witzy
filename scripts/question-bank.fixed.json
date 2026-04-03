@@ -1,0 +1,1153 @@
+{
+  "categories": [
+    {
+      "slug": "who-we-are",
+      "name": "Who We Are",
+      "icon": "🧬"
+    },
+    {
+      "slug": "how-world-works",
+      "name": "How the World Works",
+      "icon": "🌍"
+    },
+    {
+      "slug": "math-masterminds",
+      "name": "Math Masterminds",
+      "icon": "📐"
+    },
+    {
+      "slug": "language-craft",
+      "name": "Language & Craft",
+      "icon": "📚"
+    },
+    {
+      "slug": "global-perspectives",
+      "name": "Global Perspectives",
+      "icon": "🗺️"
+    },
+    {
+      "slug": "creative-expression",
+      "name": "Creative Expression",
+      "icon": "🎨"
+    },
+    {
+      "slug": "sharing-planet",
+      "name": "Sharing the Planet",
+      "icon": "🌱"
+    },
+    {
+      "slug": "logical-inquirers",
+      "name": "Logical Inquirers",
+      "icon": "🧠"
+    },
+    {
+      "slug": "systems-societies",
+      "name": "Systems & Societies",
+      "icon": "🏛️"
+    },
+    {
+      "slug": "place-and-time",
+      "name": "Place and Time",
+      "icon": "⏳"
+    }
+  ],
+  "questions": [
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Quadratic Profit Optimization",
+      "prompt": "A company's monthly profit is modeled by $P(x) = -0.9x^2 + 180x - 3200$. What is the minimum number of machines $(x)$ required to ensure the company does not incur a loss?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "10",
+        "B": "20",
+        "C": "100",
+        "D": "180"
+      },
+      "correctAnswer": "B",
+      "explanation": "To avoid a loss, $P(x) \\geq 0$. Using the quadratic formula to find the roots of $-0.9x^2 + 180x - 3200 = 0$ gives approximately 19.7 and 180.3. Thus, 20 is the minimum whole machine count for profit.",
+      "estimatedSeconds": 120,
+      "tags": []
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "Carrying Capacity vs. Footprint",
+      "prompt": "Which scenario best illustrates a city exceeding its 'carrying capacity'?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Ecological_Footprint_v_Biocapacity.png/500px-Ecological_Footprint_v_Biocapacity.png",
+      "mediaAltText": "Graph showing resource consumption vs biocapacity over time.",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "A city importing all of its luxury goods from abroad.",
+        "B": "A city where the rate of resource consumption exceeds the rate at which the local environment can regenerate them.",
+        "C": "A city with a high population density but 100% renewable energy.",
+        "D": "A city that exports surplus water to neighboring regions."
+      },
+      "correctAnswer": "B",
+      "explanation": "Carrying capacity refers to the maximum population size of a species that the environment can sustain indefinitely; exceeding it leads to environmental degradation.",
+      "estimatedSeconds": 60,
+      "tags": []
+    },
+    {
+      "categorySlug": "logical-inquirers",
+      "title": "The Exponential Lily Pad",
+      "prompt": "In the middle of a pond is a single lily pad. It doubles in size every day. If it takes 30 days to cover the entire pond, on which day was the pond half-covered?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "15",
+        "B": "28",
+        "C": "29",
+        "D": "25"
+      },
+      "correctAnswer": "C",
+      "explanation": "Because the pad doubles each day, working backward from day 30 (full) means it must have been half-full on day 29.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "logic",
+        "critical-thinking"
+      ]
+    },
+    {
+      "categorySlug": "language-craft",
+      "title": "Tone Analysis",
+      "prompt": "Listen to the speaker's inflection. Which tone is being used to deliver the line 'I'm sure you will do exactly what is expected'?",
+      "modality": "audio",
+      "mediaUrl": "https://www.learning-audio.com/samples/sarcastic_tone_1.mp3",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Encouraging",
+        "B": "Sarcastic",
+        "C": "Indifferent",
+        "D": "Melancholic"
+      },
+      "correctAnswer": "B",
+      "explanation": "The speaker uses downward inflection and heavy emphasis, indicating verbal irony where the intended meaning is the opposite of the literal words.",
+      "estimatedSeconds": 40,
+      "tags": []
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "The First Law of Motion",
+      "prompt": "A student in the top decile must analyze: Why does a ball rolling on a flat surface eventually stop if Newton's First Law says objects in motion stay in motion?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Newton's law only applies to heavy objects.",
+        "B": "The ball 'runs out' of force.",
+        "C": "Unbalanced external forces like friction and air resistance act upon it.",
+        "D": "Gravity pulls it forward until it gets tired."
+      },
+      "correctAnswer": "C",
+      "explanation": "In an ideal vacuum without friction, the ball would roll forever. On Earth, external forces change its state of motion.",
+      "estimatedSeconds": 30,
+      "tags": [
+        "physics",
+        "forces"
+      ]
+    },
+    {
+      "categorySlug": "systems-societies",
+      "title": "Valuation Logic",
+      "prompt": "Why might an investment banker favor a Discounted Cash Flow (DCF) valuation over Precedent Transactions for a highly unique startup?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "DCF is easier to calculate manually.",
+        "B": "Precedent Transactions rely on finding similar past deals, which may not exist for a unique company.",
+        "C": "DCF ignore future growth, making it safer.",
+        "D": "Precedent Transactions are only used for government agencies."
+      },
+      "correctAnswer": "B",
+      "explanation": "DCF provides an intrinsic value based on future cash flows, whereas Precedent Transactions are relative and require comparable market data.",
+      "estimatedSeconds": 100,
+      "tags": []
+    },
+    {
+      "categorySlug": "place-and-time",
+      "title": "Map Projection Bias",
+      "prompt": "Which map projection significantly distorts the size of landmasses near the poles, making Greenland look as large as Africa?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Mercator_projection_SW.jpg/500px-Mercator_projection_SW.jpg",
+      "mediaAltText": "A standard world map used in many classrooms.",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Peters Projection",
+        "B": "Mercator Projection",
+        "C": "Robinson Projection",
+        "D": "Winkel Tripel Projection"
+      },
+      "correctAnswer": "B",
+      "explanation": "The Mercator projection preserves angles for navigation but creates massive area distortion at high latitudes.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "geography",
+        "perspective"
+      ]
+    },
+    {
+      "categorySlug": "creative-expression",
+      "title": "Symbolism in Art",
+      "prompt": "In Guernica by Picasso, what does the 'shattered sword' held by the fallen soldier most likely represent?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/7/74/PicassoGuernica.jpg/500px-PicassoGuernica.jpg",
+      "mediaAltText": "Cubist painting showing the horrors of war.",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "The soldier's lack of training.",
+        "B": "The defeat of traditional warfare against modern aerial bombardment.",
+        "C": "A hidden message for a secret society.",
+        "D": "The end of the working day."
+      },
+      "correctAnswer": "B",
+      "explanation": "The shattered sword symbolizes the helplessness of humanity against the overwhelming power of modern, industrialized warfare.",
+      "estimatedSeconds": 70,
+      "tags": [
+        "arts",
+        "history",
+        "symbolism"
+      ]
+    },
+    {
+      "categorySlug": "global-perspectives",
+      "title": "Universal Human Rights",
+      "prompt": "Is the statement 'Human rights are culturally relative' Factual, Conceptual, or Debatable?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Factual",
+        "B": "Conceptual",
+        "C": "Debatable",
+        "D": "None of the above"
+      },
+      "correctAnswer": "C",
+      "explanation": "In the IB framework, this is a 'Debatable' question because it involves weighing universalism against cultural sovereignty, with no single correct consensus.",
+      "estimatedSeconds": 50,
+      "tags": [
+        "global-politics",
+        "ethics"
+      ]
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "The Handshake Problem",
+      "prompt": "If there are 10 people in a room and everyone shakes hands with everyone else exactly once, how many handshakes occur in total?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "100",
+        "B": "90",
+        "C": "45",
+        "D": "50"
+      },
+      "correctAnswer": "C",
+      "explanation": "Using the formula $n(n-1)/2$, we get $10 \\times 9 / 2 = 45$. Each handshake involves two people, so we avoid double-counting.",
+      "estimatedSeconds": 60,
+      "tags": [
+        "logic",
+        "combinatorics"
+      ]
+    },
+    {
+      "categorySlug": "who-we-are",
+      "title": "Senses and Perception",
+      "prompt": "True or False: Human beings only possess five senses.",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "true_false",
+      "options": {
+        "A": "True",
+        "B": "False"
+      },
+      "correctAnswer": "B",
+      "explanation": "False. Humans have many more, including balance (equilibrioception), temperature (thermoception), and body position (proprioception).",
+      "estimatedSeconds": 15,
+      "tags": [
+        "biology",
+        "perception"
+      ]
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "Ecological Feedback Loops",
+      "prompt": "How does the melting of Arctic permafrost create a 'positive feedback loop' in climate change?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "It creates more land for trees to grow, which absorb CO2.",
+        "B": "It releases trapped methane, a potent greenhouse gas, which causes further warming and more melting.",
+        "C": "It cools the ocean down, slowing global warming.",
+        "D": "It has no measurable effect on the atmosphere."
+      },
+      "correctAnswer": "B",
+      "explanation": "A positive feedback loop occurs when the effect of a process increases that process. Methane release accelerates the very warming that caused the melting.",
+      "estimatedSeconds": 90,
+      "tags": []
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "Simple Machines Inquiry",
+      "prompt": "Identify which component in this complex machine is a 'Third Class Lever'.",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Lever_classes.png/500px-Lever_classes.png",
+      "mediaAltText": "Diagram showing three classes of levers.",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "single_tap_image",
+      "options": {
+        "A": "The Seesaw",
+        "B": "The Wheelbarrow",
+        "C": "The Fishing Rod",
+        "D": "The Crowbar"
+      },
+      "correctAnswer": "C",
+      "explanation": "In a 3rd class lever, the effort is between the fulcrum and the load. A fishing rod or human arm are classic examples.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "physics",
+        "machines"
+      ]
+    },
+    {
+      "categorySlug": "logical-inquirers",
+      "title": "Reason vs. Emotion",
+      "prompt": "According to the Theory of Knowledge framework, is it possible to have purely 'objective' knowledge in the Human Sciences?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Yes, because statistics never lie.",
+        "B": "No, because the observer is part of the system being studied, leading to inevitable bias.",
+        "C": "Yes, if the scientist uses a computer.",
+        "D": "Only in Economics, not in Psychology."
+      },
+      "correctAnswer": "B",
+      "explanation": "The 'Hawthorne Effect' and other biases suggest that human subjects change behavior when observed, making total objectivity a challenge.",
+      "estimatedSeconds": 90,
+      "tags": []
+    },
+    {
+      "categorySlug": "language-craft",
+      "title": "The Sapir-Whorf Hypothesis",
+      "prompt": "What is the core claim of the Sapir-Whorf hypothesis regarding language acquisition?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "All children are born with a universal grammar.",
+        "B": "The structure of a language determines or influences the way its speakers perceive the world.",
+        "C": "Language is learned purely through imitation.",
+        "D": "Vowels are more important than consonants in early learning."
+      },
+      "correctAnswer": "B",
+      "explanation": "This theory of linguistic relativity suggests that our mental categories are shaped by the vocabulary and grammar of our native tongue.",
+      "estimatedSeconds": 80,
+      "tags": []
+    },
+    {
+      "categorySlug": "systems-societies",
+      "title": "Supply and Demand",
+      "prompt": "If a new technology makes producing smartphones much cheaper, what is the most likely effect on the market 'ceteris paribus'?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Demand will decrease.",
+        "B": "Supply will shift to the right, lowering the equilibrium price.",
+        "C": "The price will stay the same but quality will drop.",
+        "D": "The government will ban smartphones."
+      },
+      "correctAnswer": "B",
+      "explanation": "Lower production costs increase supply. On a graph, this shifts the supply curve right, resulting in a lower market clearing price.",
+      "estimatedSeconds": 50,
+      "tags": []
+    },
+    {
+      "categorySlug": "place-and-time",
+      "title": "Interconnected Civilizations",
+      "prompt": "How did the 'Silk Road' influence the development of cultures in both Europe and Asia?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "It was only used for selling silk, having no other impact.",
+        "B": "It facilitated the exchange of goods, religions, technologies, and even diseases across continents.",
+        "C": "It was a wall that kept people apart.",
+        "D": "It was an underwater tunnel for ships."
+      },
+      "correctAnswer": "B",
+      "explanation": "The Silk Road was a network of trans-continental trade routes that acted as a primary conduit for cultural diffusion.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "history",
+        "connection"
+      ]
+    },
+    {
+      "categorySlug": "creative-expression",
+      "title": "Rhythm and Meter",
+      "prompt": "Identify the 'Iambic Pentameter' pattern in the following audio clip of a Shakespearean sonnet.",
+      "modality": "audio",
+      "mediaUrl": "https://audio-samples.com/shakespeare/sonnet_18.mp3",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "DA-dum DA-dum DA-dum DA-dum DA-dum",
+        "B": "da-DUM da-DUM da-DUM da-DUM da-DUM",
+        "C": "DUM-da-da DUM-da-da DUM-da-da",
+        "D": "da-da-DUM da-da-DUM"
+      },
+      "correctAnswer": "B",
+      "explanation": "Iambic pentameter consists of five 'iambs' (an unstressed syllable followed by a stressed one), mimicking the rhythm of a heartbeat.",
+      "estimatedSeconds": 60,
+      "tags": [
+        "literature",
+        "poetry"
+      ]
+    },
+    {
+      "categorySlug": "who-we-are",
+      "title": "Learner Profile Reflection",
+      "prompt": "Which attribute of the IB Learner Profile is most demonstrated by a student who realizes they made a mistake and actively seeks a new perspective to fix it?",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Principled",
+        "B": "Reflective",
+        "C": "Risk-taker",
+        "D": "Knowledgeable"
+      },
+      "correctAnswer": "B",
+      "explanation": "Reflective learners give thoughtful consideration to their own learning and experience, acknowledging their strengths and limitations.",
+      "estimatedSeconds": 20,
+      "tags": []
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Standard Deviation Change",
+      "prompt": "If every value in a statistical data set is increased by exactly 5, what happens to the Standard Deviation?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "It increases by 5.",
+        "B": "It increases by 25.",
+        "C": "It remains the same.",
+        "D": "It decreases by 5."
+      },
+      "correctAnswer": "C",
+      "explanation": "Standard deviation measures the spread of data. Since the entire set shifted together, the distance between the values remains unchanged.",
+      "estimatedSeconds": 90,
+      "tags": []
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "Aerodynamics and Lift",
+      "prompt": "Using Bernoulli's Principle, explain why an airplane wing is curved on top.",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Airfoil_lift_derivation.svg/500px-Airfoil_lift_derivation.svg.png",
+      "mediaAltText": "Diagram of air flowing over an airfoil.",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "To look more like a bird.",
+        "B": "To increase air speed on top, creating lower pressure and generating lift.",
+        "C": "To catch the wind and pull the plane forward.",
+        "D": "To make the wing heavier so the plane doesn't float away."
+      },
+      "correctAnswer": "B",
+      "explanation": "Faster moving air exerts less pressure. The curve forces air on top to travel faster than air below, creating an upward force (lift).",
+      "estimatedSeconds": 80,
+      "tags": [
+        "physics",
+        "aerodynamics"
+      ]
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "The Tragedy of the Commons",
+      "prompt": "The 'Tragedy of the Commons' occurs when individuals acting in their own self-interest deplete a shared resource. Which is an example of this?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "A person buying a private car.",
+        "B": "Overfishing in international waters where no single country has control.",
+        "C": "A farmer planting corn on their own land.",
+        "D": "A city building a public library."
+      },
+      "correctAnswer": "B",
+      "explanation": "When a resource is open to all (like the ocean), individuals take as much as possible, eventually destroying the resource for everyone.",
+      "estimatedSeconds": 60,
+      "tags": [
+        "economics",
+        "environment"
+      ]
+    },
+    {
+      "categorySlug": "language-craft",
+      "title": "Literary Irony",
+      "prompt": "In a story, a fire station burns down. What type of literary device is this?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Metaphor",
+        "B": "Situational Irony",
+        "C": "Hyperbole",
+        "D": "Onomatopoeia"
+      },
+      "correctAnswer": "B",
+      "explanation": "Situational irony occurs when the outcome is the exact opposite of what was reasonably expected.",
+      "estimatedSeconds": 30,
+      "tags": []
+    },
+    {
+      "categorySlug": "global-perspectives",
+      "title": "Soft Power vs. Hard Power",
+      "prompt": "Which of these is an example of 'Soft Power' in global politics?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Economic sanctions on a neighboring country.",
+        "B": "A military invasion to change a government.",
+        "C": "The global popularity of a country's films and music influencing foreign public opinion.",
+        "D": "A naval blockade of a major port."
+      },
+      "correctAnswer": "C",
+      "explanation": "Soft power is the ability to attract and co-opt rather than coerce, using culture and values instead of force or money.",
+      "estimatedSeconds": 50,
+      "tags": [
+        "politics",
+        "power"
+      ]
+    },
+    {
+      "categorySlug": "logical-inquirers",
+      "title": "Validity vs. Truth",
+      "prompt": "In logic, can an argument be 'valid' even if the conclusion is 'false'?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "true_false",
+      "options": {
+        "A": "True",
+        "B": "False"
+      },
+      "correctAnswer": "A",
+      "explanation": "True. Validity refers only to the logical structure. If the premises are false (e.g., 'All cats are green'), the logic can still be valid even if the conclusion is factually wrong.",
+      "estimatedSeconds": 70,
+      "tags": []
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Circle Theorems",
+      "prompt": "Look at the image of the circle. According to the 'Angle at the Center' theorem, if angle ACB on the circumference is 40 degrees, what is angle AOB at the center?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Circle_theorem_center_angle.svg/500px-Circle_theorem_center_angle.svg.png",
+      "mediaAltText": "A circle with an inscribed angle and a central angle subtended by the same arc.",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "20 degrees",
+        "B": "40 degrees",
+        "C": "80 degrees",
+        "D": "120 degrees"
+      },
+      "correctAnswer": "C",
+      "explanation": "The angle subtended by an arc at the center is always twice the angle subtended by it at any point on the circumference.",
+      "estimatedSeconds": 60,
+      "tags": []
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "Renewable Energy Trade-offs",
+      "prompt": "What is a major 'Environmental Impact' of large-scale hydroelectric dams, despite being a renewable energy source?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "They emit large amounts of smoke.",
+        "B": "They disrupt fish migration and destroy upstream river habitats through flooding.",
+        "C": "They use up all the water so it can't be used for drinking.",
+        "D": "They make the water too salty for plants."
+      },
+      "correctAnswer": "B",
+      "explanation": "Hydro dams significantly alter local ecosystems and river connectivity, illustrating that every energy source has trade-offs.",
+      "estimatedSeconds": 45,
+      "tags": []
+    },
+    {
+      "categorySlug": "systems-societies",
+      "title": "The Circular Economy",
+      "prompt": "How does a 'Circular Economy' differ from a traditional 'Linear Economy'?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "It only uses money made of circles.",
+        "B": "It focuses on a 'take-make-dispose' model.",
+        "C": "It aims to eliminate waste by designing products for reuse, repair, and recycling.",
+        "D": "It means the government controls all factories."
+      },
+      "correctAnswer": "C",
+      "explanation": "The circular economy mimics natural systems where there is no 'waste', only inputs for other processes.",
+      "estimatedSeconds": 50,
+      "tags": [
+        "sustainability",
+        "economics"
+      ]
+    },
+    {
+      "categorySlug": "who-we-are",
+      "title": "Human Body Systems",
+      "prompt": "Which system is responsible for transporting oxygen and nutrients to cells while removing carbon dioxide?",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Digestive System",
+        "B": "Circulatory System",
+        "C": "Nervous System",
+        "D": "Skeletal System"
+      },
+      "correctAnswer": "B",
+      "explanation": "The circulatory system (heart, blood, and vessels) acts as the body's internal transportation network.",
+      "estimatedSeconds": 20,
+      "tags": [
+        "science",
+        "biology"
+      ]
+    },
+    {
+      "categorySlug": "place-and-time",
+      "title": "The Industrial Revolution",
+      "prompt": "What was a significant social change caused by the Industrial Revolution in the 19th century?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "People moved from cities to small farms.",
+        "B": "Mass urbanization as people moved from rural areas to cities for factory work.",
+        "C": "Computers became common in every home.",
+        "D": "International travel became impossible."
+      },
+      "correctAnswer": "B",
+      "explanation": "The shift from agrarian to manufacturing economies led to rapid city growth and the rise of the working class.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "history",
+        "change"
+      ]
+    },
+    {
+      "categorySlug": "creative-expression",
+      "title": "Aesthetics and Culture",
+      "prompt": "Listen to the musical scale being played. Which cultural tradition is this 'Pentatonic Scale' most commonly associated with?",
+      "modality": "audio",
+      "mediaUrl": "https://audio-samples.com/music/pentatonic_chinese.mp3",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Western Classical Music",
+        "B": "Traditional East Asian Music",
+        "C": "Caribbean Reggae",
+        "D": "Modern Heavy Metal"
+      },
+      "correctAnswer": "B",
+      "explanation": "The pentatonic (five-note) scale is fundamental to many musical traditions, particularly in China and Japan.",
+      "estimatedSeconds": 35,
+      "tags": [
+        "music",
+        "culture"
+      ]
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "States of Matter",
+      "prompt": "What happens to the molecules of a substance during 'Sublimation'?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "They slow down and turn into a liquid.",
+        "B": "They speed up and turn directly from a solid into a gas.",
+        "C": "They stop moving entirely.",
+        "D": "They turn into a solid from a gas."
+      },
+      "correctAnswer": "B",
+      "explanation": "Sublimation is the phase transition where a solid becomes a gas without passing through the liquid phase (e.g., dry ice).",
+      "estimatedSeconds": 45,
+      "tags": [
+        "chemistry",
+        "matter"
+      ]
+    },
+    {
+      "categorySlug": "logical-inquirers",
+      "title": "The Liar's Paradox",
+      "prompt": "A person says, 'I am lying right now.' If they are telling the truth, what is the logical problem?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "They are simply wrong.",
+        "B": "It creates a paradox: if it is true, then it must be false, and if it is false, then it must be true.",
+        "C": "It is a fact about the person.",
+        "D": "Logic does not apply to speech."
+      },
+      "correctAnswer": "B",
+      "explanation": "This is the 'Epimenides Paradox'. It demonstrates the limits of self-referential systems in logic.",
+      "estimatedSeconds": 80,
+      "tags": [
+        "logic",
+        "philosophy"
+      ]
+    },
+    {
+      "categorySlug": "language-craft",
+      "title": "Authorial Choice: Diction",
+      "prompt": "Why might an author choose the word 'scrawny' instead of 'thin' to describe a character?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Because it is a shorter word.",
+        "B": "To create a negative connotation of being weak or unattractive.",
+        "C": "Because the two words mean exactly the same thing.",
+        "D": "Because 'scrawny' is easier to rhyme."
+      },
+      "correctAnswer": "B",
+      "explanation": "Connotation refers to the emotional weight of a word. 'Thin' is neutral, while 'scrawny' suggests a specific, less flattering image.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "literature",
+        "vocabulary"
+      ]
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Probability: Independent Events",
+      "prompt": "If you flip a fair coin 5 times and it lands on heads every time, what is the probability that the 6th flip will be heads?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "1/64",
+        "B": "1/2",
+        "C": "Almost zero",
+        "D": "1/6"
+      },
+      "correctAnswer": "B",
+      "explanation": "Coin flips are 'independent events'. The previous results do not influence the probability of the next flip.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "math",
+        "probability"
+      ]
+    },
+    {
+      "categorySlug": "who-we-are",
+      "title": "Ethical Frameworks",
+      "prompt": "Which ethical theory suggests that the 'right' action is the one that results in the greatest good for the greatest number of people?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "15_plus",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Deontology",
+        "B": "Utilitarianism",
+        "C": "Virtue Ethics",
+        "D": "Nihilism"
+      },
+      "correctAnswer": "B",
+      "explanation": "Utilitarianism is a form of consequentialism that prioritizes overall happiness and utility over individual rules.",
+      "estimatedSeconds": 90,
+      "tags": []
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "Biodiversity Hotspots",
+      "prompt": "Why are 'Biodiversity Hotspots' prioritized by conservationists?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Biodiversity_Hotspots.png/500px-Biodiversity_Hotspots.png",
+      "mediaAltText": "World map highlighting regions with high species richness and threat level.",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "They are the only places with nice weather.",
+        "B": "They contain high levels of endemic species that are under significant threat from human activity.",
+        "C": "They are the areas with the least amount of animals.",
+        "D": "They are easiest for tourists to visit."
+      },
+      "correctAnswer": "B",
+      "explanation": "Conservation resources are finite, so focusing on 'hotspots' protects the most unique and endangered life forms simultaneously.",
+      "estimatedSeconds": 60,
+      "tags": []
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "The Scientific Method",
+      "prompt": "In a scientific experiment, why is it vital to have a 'Control Group'?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "To make the experiment take longer.",
+        "B": "To provide a baseline for comparison to see if the independent variable actually had an effect.",
+        "C": "To ensure every student has something to do.",
+        "D": "To hide the results from other scientists."
+      },
+      "correctAnswer": "B",
+      "explanation": "The control group stays under 'normal' conditions so that any changes in the experimental group can be attributed to the variable being tested.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "science",
+        "inquiry"
+      ]
+    },
+    {
+      "categorySlug": "systems-societies",
+      "title": "Constitutional Monarchy",
+      "prompt": "What is the primary role of a Monarch in a 'Constitutional Monarchy' like the UK or Japan?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "They make all the laws and lead the army.",
+        "B": "They serve as a ceremonial head of state with powers limited by a constitution.",
+        "C": "They are elected every four years by the people.",
+        "D": "They have no role at all."
+      },
+      "correctAnswer": "B",
+      "explanation": "In such systems, the Monarch represents the nation's continuity, while elected officials handle the day-to-day government.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "civics",
+        "government"
+      ]
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Prime Numbers",
+      "prompt": "True or False: The number 1 is a prime number.",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "true_false",
+      "options": {
+        "A": "True",
+        "B": "False"
+      },
+      "correctAnswer": "B",
+      "explanation": "False. By definition, a prime number must have exactly two distinct factors: 1 and itself. Since 1 only has one factor, it is not prime.",
+      "estimatedSeconds": 15,
+      "tags": [
+        "math",
+        "numbers"
+      ]
+    },
+    {
+      "categorySlug": "place-and-time",
+      "title": "Geological Time Scales",
+      "prompt": "During which era did the dinosaurs first appear and dominate the Earth?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Geologic_Clock_with_events_and_periods.svg/500px-Geologic_Clock_with_events_and_periods.svg.png",
+      "mediaAltText": "Clock-shaped diagram of Earth's history.",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Paleozoic",
+        "B": "Mesozoic",
+        "C": "Cenozoic",
+        "D": "Precambrian"
+      },
+      "correctAnswer": "B",
+      "explanation": "The Mesozoic Era (the 'Age of Reptiles') includes the Triassic, Jurassic, and Cretaceous periods.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "history",
+        "science"
+      ]
+    },
+    {
+      "categorySlug": "creative-expression",
+      "title": "Primary Source Analysis",
+      "prompt": "When looking at a historical photograph as a 'Primary Source', what is the first thing an inquirer should evaluate?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "If the colors are pretty.",
+        "B": "The perspective and purpose of the creator/photographer.",
+        "C": "How many people are in the picture.",
+        "D": "The type of camera used."
+      },
+      "correctAnswer": "B",
+      "explanation": "Every source has a 'point of view'. Understanding who made it and why helps determine its reliability and bias.",
+      "estimatedSeconds": 50,
+      "tags": [
+        "humanities",
+        "critical-thinking"
+      ]
+    },
+    {
+      "categorySlug": "logical-inquirers",
+      "title": "Correlation vs Causation",
+      "prompt": "If 'Ice cream sales rise at the same time as drowning incidents', which logical error is made by concluding 'Ice cream causes drowning'?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "False Dilemma",
+        "B": "Confusing correlation with causation.",
+        "C": "Ad hominem attack.",
+        "D": "Circular reasoning."
+      },
+      "correctAnswer": "B",
+      "explanation": "Both variables are likely caused by a third factor: hot weather. Correlation does not equal causation.",
+      "estimatedSeconds": 40,
+      "tags": [
+        "logic",
+        "science"
+      ]
+    },
+    {
+      "categorySlug": "who-we-are",
+      "title": "Cultural Identity Symbols",
+      "prompt": "Why do different cultures use unique symbols (like flags or traditional clothing) to express their identity?",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "9_to_11",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "Because they ran out of other clothes.",
+        "B": "To communicate shared values, history, and a sense of belonging to a group.",
+        "C": "Only to show who is the boss.",
+        "D": "To hide from other people."
+      },
+      "correctAnswer": "B",
+      "explanation": "Symbols are powerful tools for non-verbal communication that reinforce community bonds and heritage.",
+      "estimatedSeconds": 25,
+      "tags": [
+        "culture",
+        "identity"
+      ]
+    },
+    {
+      "categorySlug": "math-masterminds",
+      "title": "Area and Perimeter Logic",
+      "prompt": "If a square and a circle have the same perimeter (circumference), which one has a larger area?",
+      "modality": "text",
+      "difficulty": "hard",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "The Square",
+        "B": "The Circle",
+        "C": "They are exactly the same.",
+        "D": "It depends on the size."
+      },
+      "correctAnswer": "B",
+      "explanation": "For a fixed perimeter, the circle is the most efficient shape for enclosing area. This is known as the 'Isoperimetric Inequality'.",
+      "estimatedSeconds": 100,
+      "tags": [
+        "geometry",
+        "math"
+      ]
+    },
+    {
+      "categorySlug": "sharing-planet",
+      "title": "The Water Cycle and Humans",
+      "prompt": "What is the 'primary' way that urban development disrupts the natural water cycle?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Impervious_surfaces.jpg/500px-Impervious_surfaces.jpg",
+      "mediaAltText": "City streets covered in concrete during rain.",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "By making more clouds.",
+        "B": "By creating 'impervious surfaces' that prevent water from soaking into the ground (infiltration).",
+        "C": "By drinking all the rainwater.",
+        "D": "By building too many fountains."
+      },
+      "correctAnswer": "B",
+      "explanation": "Concrete prevents groundwater recharge and increases surface runoff, which can lead to flooding and water pollution.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "science",
+        "urbanization"
+      ]
+    },
+    {
+      "categorySlug": "language-craft",
+      "title": "Character Archetypes",
+      "prompt": "Which character archetype is typically defined by a desire to protect others, even at great personal cost?",
+      "modality": "text",
+      "difficulty": "easy",
+      "ageBandMin": "6_to_8",
+      "ageBandMax": "12_to_14",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "The Villain",
+        "B": "The Hero",
+        "C": "The Trickster",
+        "D": "The Mentor"
+      },
+      "correctAnswer": "B",
+      "explanation": "The 'Hero' archetype is found across cultures and stories, representing courage and self-sacrifice for the greater good.",
+      "estimatedSeconds": 20,
+      "tags": [
+        "literature",
+        "storytelling"
+      ]
+    },
+    {
+      "categorySlug": "how-world-works",
+      "title": "Plate Tectonics",
+      "prompt": "What occurs at a 'Subduction Zone' between two tectonic plates?",
+      "modality": "image",
+      "mediaUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Subduction-en.svg/500px-Subduction-en.svg.png",
+      "mediaAltText": "Diagram showing one plate sliding under another.",
+      "difficulty": "medium",
+      "ageBandMin": "9_to_11",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "The plates move apart and create new land.",
+        "B": "One plate slides beneath another, often creating deep ocean trenches and volcanoes.",
+        "C": "The plates stay perfectly still.",
+        "D": "They turn into a single, flat plate."
+      },
+      "correctAnswer": "B",
+      "explanation": "Subduction is a fundamental process in the 'How the World Works' theme, explaining earthquakes and volcanic activity.",
+      "estimatedSeconds": 50,
+      "tags": [
+        "geology",
+        "science"
+      ]
+    },
+    {
+      "categorySlug": "systems-societies",
+      "title": "Opportunity Cost",
+      "prompt": "If a government chooses to spend 1 billion dollars on a new stadium instead of a new hospital, what is the 'Opportunity Cost'?",
+      "modality": "text",
+      "difficulty": "medium",
+      "ageBandMin": "12_to_14",
+      "ageBandMax": "15_plus",
+      "answerType": "multiple_choice",
+      "options": {
+        "A": "The cost of the stadium tickets.",
+        "B": "The benefits of the hospital that were given up.",
+        "C": "The time it took to build the stadium.",
+        "D": "Nothing, because they still have the stadium."
+      },
+      "correctAnswer": "B",
+      "explanation": "Opportunity cost is the value of the next best alternative foregone when a choice is made.",
+      "estimatedSeconds": 45,
+      "tags": [
+        "economics",
+        "choices"
+      ]
+    }
+  ]
+}

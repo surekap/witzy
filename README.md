@@ -1,6 +1,6 @@
 # Witzy
 
-Mobile-first multiplayer family quiz MVP built with Next.js App Router, TypeScript, Tailwind CSS, and Neon as the runtime source of truth.
+Mobile-first multiplayer family quiz MVP built with Next.js App Router, TypeScript, Tailwind CSS, and Convex as the runtime source of truth.
 
 Production URL: [witzy.sureka.family](https://witzy.sureka.family)
 
@@ -12,36 +12,37 @@ Production URL: [witzy.sureka.family](https://witzy.sureka.family)
 - Simultaneous answering, host-controlled reveals, and public leaderboard updates
 - Text, image, and audio question support
 - Solo practice mode for one-player warmups and quick adaptive runs
-- Simple username/password accounts stored in Neon
-- One shared question bank in Neon for both live games and practice mode
+- Simple username/password accounts stored in Convex
+- One shared question bank in Convex for both live games and practice mode
 - Lifetime practice progress derived from answer history linked to the main `questions` table
 - Unit, integration, and browser e2e tests
-- Neon schema SQL plus a seed script
+- Convex schema/functions plus seed and import scripts
 
 ## Setup
 
 1. Install dependencies with `corepack pnpm install`
-2. Set `DATABASE_URL` in `.env.local`
-3. Run `corepack pnpm db:init`
+2. Run `corepack pnpm convex:dev` to create or link a Convex deployment
+3. Set `NEXT_PUBLIC_CONVEX_URL` and `SESSION_SECRET` in `.env.local`
 4. Run `corepack pnpm seed` or `corepack pnpm import:questions <path-to-json>`
 5. Run the app with `corepack pnpm dev`
 
-The app now expects Neon for runtime storage. Rooms, account-backed practice progress, and the shared question bank all read from the database.
+The app now expects Convex for runtime storage. Rooms, account-backed practice progress, question flags, and the shared question bank all read from Convex.
 
 ## Environment Variables
 
-- `DATABASE_URL`: Neon connection string for runtime storage and seeding
+- `NEXT_PUBLIC_CONVEX_URL`: Convex deployment URL used by the app and server-side data bridge
+- `CONVEX_ADMIN_KEY`: Optional server-only key for privileged Convex calls
 - `NEXT_PUBLIC_APP_URL`: Base URL for join links. Set this to `https://witzy.sureka.family` in production.
 - `SESSION_SECRET`: Long random string for production deployments
 - `MEDIA_BASE_URL`: Optional future override for hosted media assets
 
-## Neon Schema And Seeding
+## Convex Backend And Seeding
 
-1. Apply [`lib/db/schema.sql`](/Users/prateeksureka/Sites/kids_quiz/lib/db/schema.sql) to your Neon database
+1. Sync the Convex backend with `corepack pnpm convex:dev` locally or `corepack pnpm convex:deploy` for production
 2. Run `corepack pnpm seed`
 3. To import a custom JSON question bank instead, run `corepack pnpm import:questions <path-to-json>`
 
-Without `DATABASE_URL`, the seed command writes a local preview file so you can inspect the generated content, but the app itself expects Neon at runtime.
+Without Convex runtime env vars, the seed command writes a local preview file so you can inspect the generated content, but the app itself expects Convex at runtime.
 
 Detailed format and authoring guidance:
 
@@ -51,6 +52,8 @@ Detailed format and authoring guidance:
 ## Scripts
 
 - `corepack pnpm dev`
+- `corepack pnpm convex:dev`
+- `corepack pnpm convex:deploy`
 - `corepack pnpm db:init`
 - `corepack pnpm build`
 - `corepack pnpm lint`
@@ -70,4 +73,4 @@ Detailed format and authoring guidance:
 
 - The UI and route handlers are serverless-friendly and avoid custom websocket infrastructure
 - Active gameplay uses polling instead of custom socket infrastructure for Vercel compatibility
-- Rooms, accounts, practice attempts, and the shared question bank are stored in Neon
+- Rooms, accounts, practice attempts, question flags, and the shared question bank are stored in Convex
