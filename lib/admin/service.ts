@@ -1,9 +1,10 @@
 import { runConvexQuery } from "@/lib/db/convex";
 import { replaceQuestionBank } from "@/lib/db/question-bank";
 import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
+import { isQuestionAgeCompatible } from "@/lib/questions/assignment";
 import { normalizeImportedQuestionBank } from "@/lib/questions/import-format";
 import { getQuestionFlagSummaries } from "@/lib/question-flags/service";
-import { ageBands, type AgeBand, type Category, type Question } from "@/types/game";
+import { ageBands, type AgeBand, type Category, type GameRoom, type Question } from "@/types/game";
 import type {
   AdminDashboardData,
   AdminPlayerPerformanceEntry,
@@ -37,19 +38,7 @@ type PracticeAttemptRow = {
 
 type PersistedRoomStateRow = {
   roomCode: string;
-  room: {
-    updatedAt: string;
-    rounds: Array<{
-      startedAt: string | null;
-      lockedAt: string | null;
-      revealedAt: string | null;
-      results: Array<{
-        displayName: string;
-        ageBand: AgeBand;
-        isCorrect: boolean;
-      }>;
-    }>;
-  };
+  room: GameRoom;
   version: number;
   updatedAt: string;
 };
@@ -390,6 +379,108 @@ function buildPlayerPerformance(params: {
   };
 }
 
+type PlayerQuestionCoverageAccumulator = {
+  playerKey: string;
+  displayName: string;
+  ageBand: AgeBand;
+  seenQuestionIds: Set<string>;
+};
+
+function normalizeRoomPlayerKey(displayName: string, ageBand: AgeBand) {
+  return `room:${displayName.trim().toLowerCase()}:${ageBand}`;
+}
+
+function buildPlayerQuestionAvailabilityMatrix(params: {
+  categories: Category[];
+  questions: Question[];
+  roomStates: PersistedRoomStateRow[];
+}) {
+  const ageBandIndex = new Map(ageBands.map((ageBand, index) => [ageBand, index]));
+  const players = new Map<string, PlayerQuestionCoverageAccumulator>();
+  const activeQuestions = params.questions.filter((question) => question.active);
+
+  const ensurePlayer = (displayName: string, ageBand: AgeBand) => {
+    const playerKey = normalizeRoomPlayerKey(displayName, ageBand);
+    const existing = players.get(playerKey) ?? {
+      playerKey,
+      displayName,
+      ageBand,
+      seenQuestionIds: new Set<string>(),
+    };
+    players.set(playerKey, existing);
+    return existing;
+  };
+
+  for (const roomState of params.roomStates) {
+    const playersById = new Map(roomState.room.players.map((player) => [player.id, player]));
+
+    for (const player of roomState.room.players) {
+      ensurePlayer(player.displayName, player.ageBand);
+    }
+
+    for (const round of roomState.room.rounds) {
+      for (const assignment of round.assignments) {
+        const player = playersById.get(assignment.gamePlayerId);
+        if (!player) {
+          continue;
+        }
+
+        const accumulator = ensurePlayer(player.displayName, player.ageBand);
+        accumulator.seenQuestionIds.add(assignment.questionId);
+      }
+    }
+  }
+
+  const categories = [...params.categories].sort(
+    (left, right) => left.name.localeCompare(right.name) || left.slug.localeCompare(right.slug),
+  );
+
+  const rows = [...players.values()]
+    .sort(
+      (left, right) =>
+        left.displayName.localeCompare(right.displayName) ||
+        (ageBandIndex.get(left.ageBand) ?? 0) - (ageBandIndex.get(right.ageBand) ?? 0),
+    )
+    .map((player) => {
+      const cells = categories.map((category) => {
+        const eligibleQuestionIds = activeQuestions
+          .filter(
+            (question) =>
+              question.categoryId === category.id && isQuestionAgeCompatible(question, player.ageBand),
+          )
+          .map((question) => question.id);
+        const unseenQuestionIds = eligibleQuestionIds.filter(
+          (questionId) => !player.seenQuestionIds.has(questionId),
+        );
+
+        return {
+          categoryId: category.id,
+          eligibleCount: eligibleQuestionIds.length,
+          seenCount: eligibleQuestionIds.length - unseenQuestionIds.length,
+          unseenCount: unseenQuestionIds.length,
+          unseenQuestionIds,
+        };
+      });
+
+      return {
+        playerKey: player.playerKey,
+        displayName: player.displayName,
+        ageBand: player.ageBand,
+        cells,
+      };
+    });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    categories: categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+    })),
+    rows,
+  };
+}
+
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const [{ categories, questions }, flaggedQuestions, accounts, attempts, roomStates] = await Promise.all([
     loadQuestionBankFromDatabase(),
@@ -446,6 +537,11 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     playerPerformance: buildPlayerPerformance({
       accounts,
       attempts,
+      roomStates,
+    }),
+    playerQuestionAvailability: buildPlayerQuestionAvailabilityMatrix({
+      categories,
+      questions,
       roomStates,
     }),
   };

@@ -55,12 +55,15 @@ export function assignQuestionForPlayer(params: {
   ageBand: AgeBand;
   targetDifficulty: QuestionDifficulty;
   usedQuestionIds: Set<string>;
+  excludedQuestionIds?: Set<string>;
 }) {
+  const excludedQuestionIds = params.excludedQuestionIds ?? new Set<string>();
   const categoryQuestions = params.questions.filter(
     (question) =>
       question.categoryId === params.categoryId &&
       question.active &&
-      isQuestionAgeCompatible(question, params.ageBand),
+      isQuestionAgeCompatible(question, params.ageBand) &&
+      !excludedQuestionIds.has(question.id),
   );
 
   const adjacentDifficulties = buildDifficultyRelaxation(params.targetDifficulty);

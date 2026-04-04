@@ -469,6 +469,73 @@ export function AdminPanel({
           </section>
 
           <section className="surface space-y-4">
+            <p className="section-eyebrow">Available question matrix</p>
+            <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
+              Rows are players. Columns are categories. Each cell shows unseen / eligible questions for that player.
+            </p>
+            {dashboard.playerQuestionAvailability.rows.length === 0 ? (
+              <p style={{ color: "var(--ink-muted)", fontSize: "0.9rem" }}>
+                No room players yet.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)" }}>
+                        Player
+                      </th>
+                      <th style={{ textAlign: "left", padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)" }}>
+                        Age band
+                      </th>
+                      {dashboard.playerQuestionAvailability.categories.map((category) => (
+                        <th
+                          key={category.id}
+                          style={{ textAlign: "right", padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)", minWidth: 140 }}
+                        >
+                          {category.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.playerQuestionAvailability.rows.map((row) => (
+                      <tr key={row.playerKey}>
+                        <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)", fontWeight: 700 }}>
+                          {row.displayName}
+                        </td>
+                        <td style={{ padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)", color: "var(--ink-muted)" }}>
+                          {row.ageBand}
+                        </td>
+                        {row.cells.map((cell) => (
+                          <td
+                            key={`${row.playerKey}:${cell.categoryId}`}
+                            style={{ padding: "0.5rem", borderBottom: "1px solid var(--ink-faint)", textAlign: "right", verticalAlign: "top" }}
+                          >
+                            <p style={{ fontWeight: 700, color: cell.unseenCount === 0 ? "var(--berry)" : "var(--forest)" }}>
+                              {cell.unseenCount} / {cell.eligibleCount}
+                            </p>
+                            {cell.unseenQuestionIds.length > 0 ? (
+                              <details>
+                                <summary style={{ cursor: "pointer", color: "var(--ink-muted)", fontSize: "0.72rem" }}>
+                                  IDs
+                                </summary>
+                                <p style={{ marginTop: "0.25rem", color: "var(--ink-muted)", textAlign: "left", whiteSpace: "normal" }}>
+                                  {cell.unseenQuestionIds.join(", ")}
+                                </p>
+                              </details>
+                            ) : null}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="surface space-y-4">
             <p className="section-eyebrow">Player performance over time</p>
             <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
               Trend delta = last 10 accuracy minus first 10 accuracy.

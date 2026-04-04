@@ -6,6 +6,11 @@ export interface PersistedRoomState {
   version: number;
 }
 
+export interface PersistedRoomStateListEntry extends PersistedRoomState {
+  roomCode: string;
+  updatedAt: string;
+}
+
 export async function loadQuestionBankFromDatabase() {
   return runConvexQuery<Record<string, never>, { categories: Category[]; questions: Question[] }>(
     "questionBank:listQuestionBank",
@@ -17,6 +22,10 @@ export async function loadRoomStateFromDatabase(roomCode: string): Promise<Persi
   return runConvexQuery<{ roomCode: string }, PersistedRoomState | null>("rooms:getRoomState", {
     roomCode: roomCode.toUpperCase(),
   });
+}
+
+export async function loadAllRoomStatesFromDatabase(): Promise<PersistedRoomStateListEntry[]> {
+  return runConvexQuery<Record<string, never>, PersistedRoomStateListEntry[]>("rooms:listRoomStates", {});
 }
 
 export async function insertRoomStateIntoDatabase(room: GameRoom) {

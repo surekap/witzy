@@ -60,6 +60,33 @@ export interface AdminPlayerPerformanceSummary {
   players: AdminPlayerPerformanceEntry[];
 }
 
+export interface AdminPlayerQuestionAvailabilityCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface AdminPlayerQuestionAvailabilityCell {
+  categoryId: string;
+  unseenCount: number;
+  seenCount: number;
+  eligibleCount: number;
+  unseenQuestionIds: string[];
+}
+
+export interface AdminPlayerQuestionAvailabilityRow {
+  playerKey: string;
+  displayName: string;
+  ageBand: AgeBand;
+  cells: AdminPlayerQuestionAvailabilityCell[];
+}
+
+export interface AdminPlayerQuestionAvailabilityMatrix {
+  generatedAt: string;
+  categories: AdminPlayerQuestionAvailabilityCategory[];
+  rows: AdminPlayerQuestionAvailabilityRow[];
+}
+
 export interface AdminDashboardData {
   generatedAt: string;
   questionFrequency: AdminQuestionFrequencyDistribution;
@@ -74,6 +101,7 @@ export interface AdminDashboardData {
     latestReportedAt: string;
   }>;
   playerPerformance: AdminPlayerPerformanceSummary;
+  playerQuestionAvailability: AdminPlayerQuestionAvailabilityMatrix;
 }
 
 export interface AdminUploadResult {

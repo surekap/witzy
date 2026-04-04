@@ -5,6 +5,7 @@ import {
 } from "@/lib/questions/assignment";
 import {
   insertRoomStateIntoDatabase,
+  loadAllRoomStatesFromDatabase,
   loadQuestionBankFromDatabase,
   loadRoomStateFromDatabase,
   updateRoomStateInDatabase,
@@ -158,6 +159,46 @@ function getAgeBandLabel(ageBand: AgeBand) {
   }
 
   return "15+ years";
+}
+
+function normalizePlayerHistoryKey(displayName: string, ageBand: AgeBand) {
+  return `${displayName.trim().toLowerCase()}::${ageBand}`;
+}
+
+type HistoricalQuestionHistory = {
+  seenQuestionIds: Set<string>;
+  correctlyAnsweredQuestionIds: Set<string>;
+};
+
+function buildHistoricalQuestionHistory(rooms: Iterable<GameRoom>) {
+  const historyByPlayer = new Map<string, HistoricalQuestionHistory>();
+
+  for (const room of rooms) {
+    const playersById = new Map(room.players.map((player) => [player.id, player]));
+    for (const round of room.rounds) {
+      for (const assignment of round.assignments) {
+        const player = playersById.get(assignment.gamePlayerId);
+        if (!player) {
+          continue;
+        }
+
+        const key = normalizePlayerHistoryKey(player.displayName, player.ageBand);
+        const existing = historyByPlayer.get(key) ?? {
+          seenQuestionIds: new Set<string>(),
+          correctlyAnsweredQuestionIds: new Set<string>(),
+        };
+
+        existing.seenQuestionIds.add(assignment.questionId);
+        if (assignment.answer?.isCorrect) {
+          existing.correctlyAnsweredQuestionIds.add(assignment.questionId);
+        }
+
+        historyByPlayer.set(key, existing);
+      }
+    }
+  }
+
+  return historyByPlayer;
 }
 
 function getMissingAgeBandsForCategory(params: {
@@ -565,6 +606,7 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
   const usedQuestionIds = new Set(
     room.rounds.flatMap((round) => round.assignments.map((assignment) => assignment.questionId)),
   );
+  const historicalQuestionHistory = buildHistoricalQuestionHistory(getStore().rooms.values());
 
   const questions = getStore().questions;
   const missingAgeBands = getMissingAgeBandsForCategory({
@@ -583,16 +625,44 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
 
   const assignments = room.players.map((player) => {
     const targetDifficulty = resolvePlayerDifficulty(player);
+    const historicalKey = normalizePlayerHistoryKey(player.displayName, player.ageBand);
+    const correctlyAnsweredQuestionIds =
+      historicalQuestionHistory.get(historicalKey)?.correctlyAnsweredQuestionIds ?? new Set<string>();
+    const usedAndMasteredQuestionIds = new Set([
+      ...usedQuestionIds,
+      ...correctlyAnsweredQuestionIds,
+    ]);
     const question = assignQuestionForPlayer({
       questions,
       categoryId,
       ageBand: player.ageBand,
       targetDifficulty,
-      usedQuestionIds,
+      usedQuestionIds: usedAndMasteredQuestionIds,
+      excludedQuestionIds: correctlyAnsweredQuestionIds,
     });
 
     if (!question) {
+      const questionIgnoringCorrectHistory =
+        correctlyAnsweredQuestionIds.size > 0
+          ? assignQuestionForPlayer({
+              questions,
+              categoryId,
+              ageBand: player.ageBand,
+              targetDifficulty,
+              usedQuestionIds,
+            })
+          : null;
+
       const categoryName = getCategoryById(categoryId)?.name ?? "That category";
+      if (questionIgnoringCorrectHistory) {
+        throw new GameError(
+          `${categoryName} has no new questions left for ${player.displayName} (${getAgeBandLabel(
+            player.ageBand,
+          )}) because they already answered the available questions correctly.`,
+          400,
+        );
+      }
+
       throw new GameError(
         `${categoryName} did not have a valid question for ${player.displayName} (${getAgeBandLabel(
           player.ageBand,
@@ -828,6 +898,7 @@ const RUNTIME_ROOM_RETRIES = 3;
 async function withScratchStore<T>(
   options: {
     roomCode?: string;
+    includeAllRooms?: boolean;
   },
   callback: () => T,
 ) {
@@ -836,7 +907,23 @@ async function withScratchStore<T>(
   const rooms = new Map<string, GameRoom>();
   let version: number | null = null;
 
-  if (options.roomCode) {
+  if (options.includeAllRooms) {
+    const persistedRooms = await loadAllRoomStatesFromDatabase();
+    for (const persistedRoom of persistedRooms) {
+      rooms.set(persistedRoom.room.roomCode, persistedRoom.room);
+    }
+
+    if (options.roomCode) {
+      const targetRoom = persistedRooms.find(
+        (persistedRoom) => persistedRoom.roomCode.toUpperCase() === options.roomCode?.toUpperCase(),
+      );
+      if (!targetRoom) {
+        throw new GameError("That room code doesn't exist yet.", 404);
+      }
+
+      version = targetRoom.version;
+    }
+  } else if (options.roomCode) {
     const persistedRoom = await loadRoomStateFromDatabase(options.roomCode);
     if (!persistedRoom) {
       throw new GameError("That room code doesn't exist yet.", 404);
@@ -872,6 +959,31 @@ async function withPersistedRoom<T>(roomCode: string, callback: () => T) {
     attempts += 1;
 
     const { result, rooms, version } = await withScratchStore({ roomCode }, callback);
+    const updatedRoom = rooms.get(roomCode.toUpperCase());
+
+    if (!updatedRoom || version === null) {
+      throw new GameError("That room code doesn't exist yet.", 404);
+    }
+
+    const nextVersion = await updateRoomStateInDatabase(updatedRoom, version);
+    if (nextVersion !== null) {
+      return result;
+    }
+  }
+
+  throw new GameError("That room changed while this action was running. Please try again.", 409);
+}
+
+async function withPersistedRoomAndHistory<T>(roomCode: string, callback: () => T) {
+  let attempts = 0;
+
+  while (attempts < RUNTIME_ROOM_RETRIES) {
+    attempts += 1;
+
+    const { result, rooms, version } = await withScratchStore(
+      { roomCode, includeAllRooms: true },
+      callback,
+    );
     const updatedRoom = rooms.get(roomCode.toUpperCase());
 
     if (!updatedRoom || version === null) {
@@ -949,7 +1061,9 @@ export async function startRound(roomCode: string, sessionKey: string | null, re
     return startRoundInMemory(roomCode, sessionKey, requestedCategoryId);
   }
 
-  return withPersistedRoom(roomCode, () => startRoundInMemory(roomCode, sessionKey, requestedCategoryId));
+  return withPersistedRoomAndHistory(roomCode, () =>
+    startRoundInMemory(roomCode, sessionKey, requestedCategoryId),
+  );
 }
 
 export async function submitAnswer(
