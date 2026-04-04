@@ -57,6 +57,39 @@ export const listAttemptsByAccountId = queryGeneric({
   },
 });
 
+export const listAccounts = queryGeneric({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+
+    return users
+      .map((user) => mapUser(user))
+      .sort((left, right) => left.username.localeCompare(right.username));
+  },
+});
+
+export const listAllAttempts = queryGeneric({
+  args: {},
+  handler: async (ctx) => {
+    const attempts = await ctx.db.query("practiceAttempts").collect();
+
+    return attempts
+      .map((attempt) => ({
+        accountId: attempt.accountId,
+        questionId: attempt.questionId,
+        submittedAnswer: attempt.submittedAnswer,
+        isCorrect: attempt.isCorrect,
+        answeredAt: attempt.answeredAt,
+      }))
+      .sort(
+        (left, right) =>
+          new Date(left.answeredAt).getTime() - new Date(right.answeredAt).getTime() ||
+          left.accountId.localeCompare(right.accountId) ||
+          left.questionId.localeCompare(right.questionId),
+      );
+  },
+});
+
 export const createAccount = mutationGeneric({
   args: {
     accountId: v.string(),

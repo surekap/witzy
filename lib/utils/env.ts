@@ -5,6 +5,7 @@ const environmentSchema = z.object({
   CONVEX_ADMIN_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   SESSION_SECRET: z.string().min(16).optional(),
+  ADMIN_PANEL_PASSWORD: z.string().min(8).optional(),
   MEDIA_BASE_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
@@ -14,6 +15,7 @@ const parsedEnvironment = environmentSchema.safeParse({
   CONVEX_ADMIN_KEY: process.env.CONVEX_ADMIN_KEY,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   SESSION_SECRET: process.env.SESSION_SECRET,
+  ADMIN_PANEL_PASSWORD: process.env.ADMIN_PANEL_PASSWORD,
   MEDIA_BASE_URL: process.env.MEDIA_BASE_URL,
   NODE_ENV: process.env.NODE_ENV,
 });
@@ -50,4 +52,12 @@ export function requireConvexAdminKey() {
   }
 
   return env.CONVEX_ADMIN_KEY;
+}
+
+export function requireAdminPanelPassword() {
+  if (!env.ADMIN_PANEL_PASSWORD) {
+    throw new Error("ADMIN_PANEL_PASSWORD is required to access admin panel features.");
+  }
+
+  return env.ADMIN_PANEL_PASSWORD;
 }

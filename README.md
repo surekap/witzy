@@ -15,6 +15,7 @@ Production URL: [witzy.sureka.family](https://witzy.sureka.family)
 - Simple username/password accounts stored in Convex
 - One shared question bank in Convex for both live games and practice mode
 - Lifetime practice progress derived from answer history linked to the main `questions` table
+- Admin panel at `/admin` for question-bank frequency audits, question upload/removal, and player progression analytics
 - Unit, integration, and browser e2e tests
 - Convex schema/functions plus seed and import scripts
 
@@ -34,6 +35,7 @@ The app now expects Convex for runtime storage. Rooms, account-backed practice p
 - `CONVEX_ADMIN_KEY`: Optional server-only key for privileged Convex calls
 - `NEXT_PUBLIC_APP_URL`: Base URL for join links. Set this to `https://witzy.sureka.family` in production.
 - `SESSION_SECRET`: Long random string for production deployments
+- `ADMIN_PANEL_PASSWORD`: Required for `/admin` sign-in and admin APIs
 - `MEDIA_BASE_URL`: Optional future override for hosted media assets
 
 ## Convex Backend And Seeding

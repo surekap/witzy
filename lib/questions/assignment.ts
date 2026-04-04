@@ -40,8 +40,8 @@ function buildDifficultyRelaxation(targetDifficulty: QuestionDifficulty) {
   const targetIndex = difficultyOrder.indexOf(targetDifficulty);
   return difficultyOrder
     .map((difficulty, index) => ({ difficulty, distance: Math.abs(index - targetIndex) }))
-    .filter((entry) => entry.distance === 1)
     .sort((left, right) => left.distance - right.distance)
+    .filter((entry) => entry.distance > 0)
     .map((entry) => entry.difficulty);
 }
 

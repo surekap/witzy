@@ -155,6 +155,7 @@ export interface RoomViewer {
 export interface PlayerQuestionView {
   assignedQuestionId: string;
   questionId: string;
+  assignedDifficulty: QuestionDifficulty;
   title: string;
   prompt: string;
   modality: QuestionModality;

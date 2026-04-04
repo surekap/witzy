@@ -220,6 +220,35 @@ function findCategoryOrThrow(categoryId: string, categories: Category[]) {
   return category;
 }
 
+function getAgeBandLabel(ageBand: AgeBand) {
+  if (ageBand === "6_to_8") {
+    return "6 to 8 years";
+  }
+
+  if (ageBand === "9_to_11") {
+    return "9 to 11 years";
+  }
+
+  if (ageBand === "12_to_14") {
+    return "12 to 14 years";
+  }
+
+  return "15+ years";
+}
+
+function hasSeededQuestionsForCategoryAgeBand(params: {
+  questions: Question[];
+  categoryId: string;
+  ageBand: AgeBand;
+}) {
+  return params.questions.some(
+    (question) =>
+      question.categoryId === params.categoryId &&
+      question.active &&
+      isQuestionAgeCompatible(question, params.ageBand),
+  );
+}
+
 function computeQuestionPriorityScore(
   question: Question,
   category: Category,
@@ -584,6 +613,17 @@ export async function getSoloPracticeQuestion(
     }
 
     const category = findCategoryOrThrow(input.categoryId, snapshot.categories);
+    const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
+      questions: snapshot.questions,
+      categoryId: category.id,
+      ageBand: input.ageBand,
+    });
+    if (!hasSeededQuestions) {
+      throw new PracticeError(
+        `${category.name} for ${getAgeBandLabel(input.ageBand)} has no practice questions yet. Please ask an admin to seed this category for that age band.`,
+        404,
+      );
+    }
     const targetDifficulty =
       input.difficultyMode && input.difficultyMode !== "adaptive"
         ? input.difficultyMode
@@ -619,6 +659,17 @@ export async function getSoloPracticeQuestion(
   const account = await getAccountOrThrow(accountId, store);
   const { questions, categories } = getStore();
   const category = findCategoryOrThrow(input.categoryId, categories);
+  const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
+    questions,
+    categoryId: category.id,
+    ageBand: input.ageBand,
+  });
+  if (!hasSeededQuestions) {
+    throw new PracticeError(
+      `${category.name} for ${getAgeBandLabel(input.ageBand)} has no practice questions yet. Please ask an admin to seed this category for that age band.`,
+      404,
+    );
+  }
 
   const targetDifficulty =
     input.difficultyMode && input.difficultyMode !== "adaptive"

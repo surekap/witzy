@@ -13,7 +13,7 @@ import {
 
 import { primaryButtonClass, secondaryButtonClass, StatPill } from "@/components/ui";
 import { classNames } from "@/lib/utils/classnames";
-import type { AnswerKey, Category, RoomStateView } from "@/types/game";
+import type { AnswerKey, Category, QuestionDifficulty, RoomStateView } from "@/types/game";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -33,6 +33,16 @@ function getAvatarClass(color: string) {
     cyan:   "avatar-cyan",
   };
   return map[color] ?? "avatar-cyan";
+}
+
+const basePointsByDifficulty: Record<QuestionDifficulty, number> = {
+  easy: 1,
+  medium: 2,
+  hard: 3,
+};
+
+function formatDifficulty(difficulty: QuestionDifficulty) {
+  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 }
 
 function TimerPill({ endsAt, now }: { endsAt: string | null; now: number }) {
@@ -511,6 +521,11 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                     <div className="grid gap-2 mt-3 sm:grid-cols-3">
                       {[
                         {
+                          label: "Difficulty",
+                          value: `${formatDifficulty(result.assignedDifficulty)} (${basePointsByDifficulty[result.assignedDifficulty]} pts)`,
+                          color: "var(--ink)",
+                        },
+                        {
                           label: "Result",
                           value: result.isCorrect ? "Correct ✓" : "Incorrect",
                           color: result.isCorrect ? "var(--forest)" : "var(--berry)",
@@ -740,6 +755,16 @@ function PlayerQuestionPanel({
       <div>
         <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)" }}>
           {playerQuestion.title}
+        </p>
+        <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginTop: "0.25rem" }}>
+          Difficulty:{" "}
+          <strong style={{ color: "var(--ink)" }}>
+            {formatDifficulty(playerQuestion.assignedDifficulty)}
+          </strong>
+          {" · "}Worth{" "}
+          <strong style={{ color: "var(--ink)" }}>
+            {basePointsByDifficulty[playerQuestion.assignedDifficulty]} pts
+          </strong>
         </p>
         <h3
           style={{

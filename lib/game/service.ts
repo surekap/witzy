@@ -1,4 +1,8 @@
-import { assignQuestionForPlayer, resolvePlayerDifficulty } from "@/lib/questions/assignment";
+import {
+  assignQuestionForPlayer,
+  isQuestionAgeCompatible,
+  resolvePlayerDifficulty,
+} from "@/lib/questions/assignment";
 import {
   insertRoomStateIntoDatabase,
   loadQuestionBankFromDatabase,
@@ -140,6 +144,48 @@ function chooseCategory(room: GameRoom, requestedCategoryId?: string) {
   return enabledCategories[selectedIndex];
 }
 
+function getAgeBandLabel(ageBand: AgeBand) {
+  if (ageBand === "6_to_8") {
+    return "6 to 8 years";
+  }
+
+  if (ageBand === "9_to_11") {
+    return "9 to 11 years";
+  }
+
+  if (ageBand === "12_to_14") {
+    return "12 to 14 years";
+  }
+
+  return "15+ years";
+}
+
+function getMissingAgeBandsForCategory(params: {
+  categoryId: string;
+  players: GamePlayer[];
+  questions: Question[];
+}) {
+  const missingAgeBands = new Set<AgeBand>();
+
+  for (const player of params.players) {
+    const hasQuestionForAgeBand = params.questions.some(
+      (question) =>
+        question.categoryId === params.categoryId &&
+        question.active &&
+        isQuestionAgeCompatible(question, player.ageBand),
+    );
+
+    if (!hasQuestionForAgeBand) {
+      missingAgeBands.add(player.ageBand);
+    }
+  }
+
+  return [...missingAgeBands].sort((left, right) => {
+    const order: AgeBand[] = ["6_to_8", "9_to_11", "12_to_14", "15_plus"];
+    return order.indexOf(left) - order.indexOf(right);
+  });
+}
+
 function ensureHost(room: GameRoom, sessionKey: string | null) {
   if (!sessionKey || sessionKey !== room.hostSessionKey) {
     throw new GameError("Only the host can do that.", 403);
@@ -241,6 +287,7 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
         ? {
             assignedQuestionId: playerQuestion.id,
             questionId: playerQuestion.questionId,
+            assignedDifficulty: playerQuestion.assignedDifficulty,
             title: playerQuestion.questionSnapshot.title,
             prompt: playerQuestion.questionSnapshot.prompt,
             modality: playerQuestion.questionSnapshot.modality,
@@ -520,6 +567,20 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
   );
 
   const questions = getStore().questions;
+  const missingAgeBands = getMissingAgeBandsForCategory({
+    categoryId,
+    players: room.players,
+    questions,
+  });
+  if (missingAgeBands.length > 0) {
+    const categoryName = getCategoryById(categoryId)?.name ?? "That category";
+    const missingAgeBandLabels = missingAgeBands.map(getAgeBandLabel).join(", ");
+    throw new GameError(
+      `${categoryName} has no seeded questions for ${missingAgeBandLabels}. Ask an admin to seed this category for those age bands.`,
+      400,
+    );
+  }
+
   const assignments = room.players.map((player) => {
     const targetDifficulty = resolvePlayerDifficulty(player);
     const question = assignQuestionForPlayer({
@@ -531,7 +592,13 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
     });
 
     if (!question) {
-      throw new GameError("There were no suitable questions left for one of the players.", 500);
+      const categoryName = getCategoryById(categoryId)?.name ?? "That category";
+      throw new GameError(
+        `${categoryName} did not have a valid question for ${player.displayName} (${getAgeBandLabel(
+          player.ageBand,
+        )}) at the selected difficulty settings.`,
+        400,
+      );
     }
 
     usedQuestionIds.add(question.id);
@@ -541,7 +608,7 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
       gamePlayerId: player.id,
       questionId: question.id,
       questionSnapshot: question,
-      assignedDifficulty: targetDifficulty,
+      assignedDifficulty: question.difficulty,
       confidenceMode: null,
       hintUsed: false,
       answer: null,

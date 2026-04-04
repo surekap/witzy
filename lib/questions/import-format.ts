@@ -9,6 +9,7 @@ const ageBandOrder = [...ageBands];
 const answerKeys: AnswerKey[] = ["A", "B", "C", "D"];
 const modalityValues: QuestionModality[] = ["text", "image", "audio"];
 const answerTypeValues: AnswerType[] = ["multiple_choice", "single_tap_image", "true_false"];
+const defaultCategoryIcon = "📚";
 
 const categorySchema = z.object({
   id: z.string().uuid().optional(),
@@ -17,8 +18,9 @@ const categorySchema = z.object({
     .trim()
     .min(1)
     .regex(/^[a-z0-9-]+$/, "Category slugs must use lowercase letters, numbers, and hyphens."),
-  name: z.string().trim().min(1),
-  icon: z.string().trim().min(1),
+  name: z.string().trim().min(1).optional(),
+  title: z.string().trim().min(1).optional(),
+  icon: z.string().trim().min(1).optional(),
   active: z.boolean().default(true),
 });
 
@@ -107,8 +109,138 @@ export const importedQuestionBankSchema = z.object({
   questions: z.array(questionSchema).min(1),
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function slugifyCategory(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function normalizeLegacyQuestionBank(input: unknown): unknown {
+  if (!isRecord(input) || !Array.isArray(input.questions)) {
+    return input;
+  }
+
+  const looksLikeLegacy = input.categories === undefined && input.questions.some((item) => {
+    if (!isRecord(item)) {
+      return false;
+    }
+
+    return (
+      typeof item.category === "string" ||
+      typeof item.ageBand === "string" ||
+      typeof item.id === "number"
+    );
+  });
+
+  if (!looksLikeLegacy) {
+    return input;
+  }
+
+  const categoriesBySlug = new Map<string, { slug: string; name: string; icon: string; active: boolean }>();
+  const questions = input.questions.map((item) => {
+    const source = isRecord(item) ? item : {};
+    const categoryName =
+      typeof source.category === "string" && source.category.trim().length > 0
+        ? source.category.trim()
+        : "General";
+    const categorySlug = slugifyCategory(categoryName) || "general";
+
+    if (!categoriesBySlug.has(categorySlug)) {
+      categoriesBySlug.set(categorySlug, {
+        slug: categorySlug,
+        name: categoryName,
+        icon: defaultCategoryIcon,
+        active: true,
+      });
+    }
+
+    const ageBand =
+      typeof source.ageBand === "string" && ageBands.includes(source.ageBand as (typeof ageBands)[number])
+        ? (source.ageBand as (typeof ageBands)[number])
+        : "9_to_11";
+    const answerType =
+      typeof source.answerType === "string" &&
+      answerTypeValues.includes(source.answerType as AnswerType)
+        ? (source.answerType as AnswerType)
+        : "multiple_choice";
+    const difficulty =
+      typeof source.difficulty === "string" &&
+      difficultyValues.includes(source.difficulty as (typeof difficultyValues)[number])
+        ? (source.difficulty as (typeof difficultyValues)[number])
+        : "medium";
+    const optionsSource = isRecord(source.options) ? source.options : {};
+    const options = {
+      ...(typeof optionsSource.A === "string" && optionsSource.A.trim().length > 0
+        ? { A: optionsSource.A }
+        : {}),
+      ...(typeof optionsSource.B === "string" && optionsSource.B.trim().length > 0
+        ? { B: optionsSource.B }
+        : {}),
+      ...(typeof optionsSource.C === "string" && optionsSource.C.trim().length > 0
+        ? { C: optionsSource.C }
+        : {}),
+      ...(typeof optionsSource.D === "string" && optionsSource.D.trim().length > 0
+        ? { D: optionsSource.D }
+        : {}),
+    };
+    const correctAnswer =
+      typeof source.correctAnswer === "string" && answerKeys.includes(source.correctAnswer as AnswerKey)
+        ? (source.correctAnswer as AnswerKey)
+        : (Object.keys(options)[0] as AnswerKey | undefined) ?? "A";
+
+    return {
+      categorySlug,
+      title: typeof source.title === "string" && source.title.trim().length > 0 ? source.title : "Untitled",
+      prompt: typeof source.prompt === "string" && source.prompt.trim().length > 0 ? source.prompt : "No prompt provided.",
+      modality:
+        typeof source.modality === "string" && modalityValues.includes(source.modality as QuestionModality)
+          ? source.modality
+          : "text",
+      difficulty,
+      ageBandMin: ageBand,
+      ageBandMax: ageBand,
+      answerType,
+      options,
+      correctAnswer,
+      explanation:
+        typeof source.explanation === "string" && source.explanation.trim().length > 0
+          ? source.explanation
+          : "This option best matches the concept tested in the question.",
+      mediaUrl: typeof source.mediaUrl === "string" ? source.mediaUrl : undefined,
+      mediaAltText: typeof source.mediaAltText === "string" ? source.mediaAltText : undefined,
+      estimatedSeconds: typeof source.estimatedSeconds === "number" ? source.estimatedSeconds : 20,
+      active: typeof source.active === "boolean" ? source.active : true,
+      tags:
+        Array.isArray(source.tags) && source.tags.every((tag) => typeof tag === "string")
+          ? source.tags
+          : [],
+    };
+  });
+
+  return {
+    categories: [...categoriesBySlug.values()],
+    questions,
+  };
+}
+
+function toTitleCaseFromSlug(slug: string) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function normalizeImportedQuestionBank(input: unknown) {
-  const parsed = importedQuestionBankSchema.parse(input);
+  const parsed = importedQuestionBankSchema.parse(normalizeLegacyQuestionBank(input));
   const now = new Date().toISOString();
 
   const seenSlugs = new Set<string>();
@@ -121,8 +253,8 @@ export function normalizeImportedQuestionBank(input: unknown) {
     return {
       id: category.id ?? randomUUID(),
       slug: category.slug,
-      name: category.name,
-      icon: category.icon,
+      name: category.name ?? category.title ?? toTitleCaseFromSlug(category.slug),
+      icon: category.icon ?? defaultCategoryIcon,
       active: category.active,
     };
   });

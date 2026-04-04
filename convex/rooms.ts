@@ -19,6 +19,26 @@ export const getRoomState = queryGeneric({
   },
 });
 
+export const listRoomStates = queryGeneric({
+  args: {},
+  handler: async (ctx) => {
+    const rooms = await ctx.db.query("rooms").collect();
+
+    return rooms
+      .map((entry) => ({
+        roomCode: entry.roomCode,
+        room: entry.room,
+        version: entry.version,
+        updatedAt: entry.updatedAt,
+      }))
+      .sort(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime() ||
+          left.roomCode.localeCompare(right.roomCode),
+      );
+  },
+});
+
 export const insertRoomState = mutationGeneric({
   args: {
     room: v.any(),
