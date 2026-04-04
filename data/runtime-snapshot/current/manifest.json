@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "generatedAt": "2026-04-04T13:25:01.068Z",
+  "source": "convex",
+  "tables": {
+    "settings": 1,
+    "categories": 14,
+    "questions": 754,
+    "users": 3,
+    "practiceAttempts": 11,
+    "questionFlags": 6,
+    "rooms": 10
+  }
+}

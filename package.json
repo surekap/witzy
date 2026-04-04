@@ -15,7 +15,9 @@
     "convex:deploy": "convex deploy",
     "db:init": "tsx scripts/init-schema.ts",
     "seed": "tsx scripts/seed.ts",
-    "import:questions": "tsx scripts/import-questions.ts"
+    "import:questions": "tsx scripts/import-questions.ts",
+    "snapshot:export": "tsx scripts/export-runtime-snapshot.ts",
+    "snapshot:import": "tsx scripts/import-runtime-snapshot.ts"
   },
   "dependencies": {
     "convex": "^1.34.1",
