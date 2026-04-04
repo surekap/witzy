@@ -12,6 +12,7 @@ import type * as practice from "../practice.js";
 import type * as questionBank from "../questionBank.js";
 import type * as questionFlags from "../questionFlags.js";
 import type * as rooms from "../rooms.js";
+import type * as snapshot from "../snapshot.js";
 
 import type {
   ApiFromModules,
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   questionBank: typeof questionBank;
   questionFlags: typeof questionFlags;
   rooms: typeof rooms;
+  snapshot: typeof snapshot;
 }>;
 
 /**

@@ -49,6 +49,7 @@ Without Convex runtime env vars, the seed command writes a local preview file so
 Detailed format and authoring guidance:
 
 - [docs/question-seeding.md](/Users/prateeksureka/Sites/kids_quiz/docs/question-seeding.md)
+- [docs/runtime-snapshot.md](/Users/prateeksureka/Sites/kids_quiz/docs/runtime-snapshot.md)
 - [scripts/question-bank.example.json](/Users/prateeksureka/Sites/kids_quiz/scripts/question-bank.example.json)
 
 ## Scripts
@@ -64,6 +65,8 @@ Detailed format and authoring guidance:
 - `corepack pnpm typecheck`
 - `corepack pnpm seed`
 - `corepack pnpm import:questions <path-to-json>`
+- `corepack pnpm snapshot:export`
+- `corepack pnpm snapshot:import`
 
 ## Testing
 
