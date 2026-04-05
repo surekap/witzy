@@ -1,4 +1,4 @@
-import { mutationGeneric, queryGeneric } from "convex/server";
+import { mutationGeneric, paginationOptsValidator, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 
 const categoryValidator = v.object({
@@ -44,6 +44,45 @@ async function getCurrentQuestionBankVersion(ctx: any): Promise<string | null> {
   return setting?.stringValue ?? null;
 }
 
+function mapCategoryRow(category: any) {
+  return {
+    id: category.categoryId,
+    slug: category.slug,
+    name: category.name,
+    icon: category.icon,
+    active: category.active,
+  };
+}
+
+function mapQuestionRow(question: any) {
+  return {
+    id: question.questionId,
+    categoryId: question.categoryId,
+    title: question.title,
+    prompt: question.prompt,
+    modality: question.modality,
+    difficulty: question.difficulty,
+    ageBandMin: question.ageBandMin,
+    ageBandMax: question.ageBandMax,
+    answerType: question.answerType,
+    options: {
+      ...(question.optionA ? { A: question.optionA } : {}),
+      ...(question.optionB ? { B: question.optionB } : {}),
+      ...(question.optionC ? { C: question.optionC } : {}),
+      ...(question.optionD ? { D: question.optionD } : {}),
+    },
+    correctAnswer: question.correctAnswer,
+    explanation: question.explanation,
+    mediaUrl: question.mediaUrl,
+    mediaAltText: question.mediaAltText,
+    estimatedSeconds: question.estimatedSeconds,
+    active: question.active,
+    tags: question.tags,
+    createdAt: question.createdAt,
+    updatedAt: question.updatedAt,
+  };
+}
+
 export const listQuestionBank = queryGeneric({
   args: {},
   handler: async (ctx) => {
@@ -65,42 +104,65 @@ export const listQuestionBank = queryGeneric({
       categories: categories
         .filter((category: any) => category.active)
         .sort((left: any, right: any) => left.name.localeCompare(right.name))
-        .map((category: any) => ({
-          id: category.categoryId,
-          slug: category.slug,
-          name: category.name,
-          icon: category.icon,
-          active: category.active,
-        })),
+        .map(mapCategoryRow),
       questions: questions
         .filter((question: any) => question.active)
         .sort((left: any, right: any) => left.questionId.localeCompare(right.questionId))
-        .map((question: any) => ({
-          id: question.questionId,
-          categoryId: question.categoryId,
-          title: question.title,
-          prompt: question.prompt,
-          modality: question.modality,
-          difficulty: question.difficulty,
-          ageBandMin: question.ageBandMin,
-          ageBandMax: question.ageBandMax,
-          answerType: question.answerType,
-          options: {
-            ...(question.optionA ? { A: question.optionA } : {}),
-            ...(question.optionB ? { B: question.optionB } : {}),
-            ...(question.optionC ? { C: question.optionC } : {}),
-            ...(question.optionD ? { D: question.optionD } : {}),
-          },
-          correctAnswer: question.correctAnswer,
-          explanation: question.explanation,
-          mediaUrl: question.mediaUrl,
-          mediaAltText: question.mediaAltText,
-          estimatedSeconds: question.estimatedSeconds,
-          active: question.active,
-          tags: question.tags,
-          createdAt: question.createdAt,
-          updatedAt: question.updatedAt,
-        })),
+        .map(mapQuestionRow),
+    };
+  },
+});
+
+export const listQuestionBankCategories = queryGeneric({
+  args: {},
+  handler: async (ctx) => {
+    const currentVersion = await getCurrentQuestionBankVersion(ctx);
+
+    if (!currentVersion) {
+      return [] as ReturnType<typeof mapCategoryRow>[];
+    }
+
+    const categories = await ctx.db
+      .query("categories")
+      .withIndex("by_bank_version", (query) => query.eq("bankVersion", currentVersion))
+      .collect();
+
+    return categories
+      .filter((category: any) => category.active)
+      .sort((left: any, right: any) => left.name.localeCompare(right.name))
+      .map(mapCategoryRow);
+  },
+});
+
+export const listQuestionBankQuestionsPage = queryGeneric({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const currentVersion = await getCurrentQuestionBankVersion(ctx);
+
+    if (!currentVersion) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      };
+    }
+
+    const result = await ctx.db
+      .query("questions")
+      .withIndex("by_bank_version", (query) => query.eq("bankVersion", currentVersion))
+      .order("asc")
+      .paginate({
+        ...args.paginationOpts,
+        maximumRowsRead: args.paginationOpts.maximumRowsRead ?? 2000,
+      });
+
+    return {
+      ...result,
+      page: result.page
+        .filter((question: any) => question.active)
+        .map(mapQuestionRow),
     };
   },
 });

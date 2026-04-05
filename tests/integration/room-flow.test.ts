@@ -250,4 +250,137 @@ describe("room flow", () => {
     expect(result?.assignedDifficulty).toBe("hard");
     expect(result?.pointsAwarded).toBe(3);
   });
+
+  it("avoids re-serving previously correctly answered questions across games", async () => {
+    const store = getStore();
+    store.categories = [
+      {
+        id: "category_repeat_guard",
+        slug: "repeat-guard",
+        name: "Repeat Guard",
+        icon: "🧠",
+        active: true,
+      },
+    ];
+    store.questions = [
+      {
+        id: "question_repeat_guard_1",
+        categoryId: "category_repeat_guard",
+        title: "Repeat Guard Q1",
+        prompt: "Prompt 1",
+        modality: "text",
+        difficulty: "easy",
+        ageBandMin: "9_to_11",
+        ageBandMax: "9_to_11",
+        answerType: "multiple_choice",
+        options: { A: "A", B: "B", C: "C", D: "D" },
+        correctAnswer: "A",
+        explanation: "Because",
+        mediaUrl: null,
+        mediaAltText: null,
+        estimatedSeconds: 15,
+        active: true,
+        tags: [],
+        createdAt: "2026-04-03T00:00:00.000Z",
+        updatedAt: "2026-04-03T00:00:00.000Z",
+      },
+      {
+        id: "question_repeat_guard_2",
+        categoryId: "category_repeat_guard",
+        title: "Repeat Guard Q2",
+        prompt: "Prompt 2",
+        modality: "text",
+        difficulty: "easy",
+        ageBandMin: "9_to_11",
+        ageBandMax: "9_to_11",
+        answerType: "multiple_choice",
+        options: { A: "A", B: "B", C: "C", D: "D" },
+        correctAnswer: "A",
+        explanation: "Because",
+        mediaUrl: null,
+        mediaAltText: null,
+        estimatedSeconds: 15,
+        active: true,
+        tags: [],
+        createdAt: "2026-04-03T00:00:00.000Z",
+        updatedAt: "2026-04-03T00:00:00.000Z",
+      },
+    ];
+
+    const firstRoom = await createRoom({
+      hostName: "Morgan",
+      config: {
+        numberOfRounds: 5,
+        answerTimeLimitSeconds: 15,
+        categoryMode: "host_selects_each_round",
+        enabledCategoryIds: ["category_repeat_guard"],
+        fastestCorrectBonus: false,
+        confidenceWager: false,
+        teamBonus: false,
+        hints: false,
+      },
+    });
+
+    const firstSession = await joinRoom(
+      firstRoom.roomCode,
+      {
+        displayName: "Ava",
+        ageBand: "9_to_11",
+        difficultyMode: "easy",
+        avatarColor: "cyan",
+      },
+      null,
+    );
+
+    await startGame(firstRoom.roomCode, firstRoom.sessionKey);
+    await startRound(firstRoom.roomCode, firstRoom.sessionKey, "category_repeat_guard");
+    const firstAssignment = getStore()
+      .rooms.get(firstRoom.roomCode)
+      ?.rounds.at(-1)
+      ?.assignments.find((entry) => entry.gamePlayerId === firstSession.playerId);
+
+    expect(firstAssignment).toBeDefined();
+
+    await submitAnswer(firstRoom.roomCode, firstSession.sessionKey, {
+      assignedQuestionId: firstAssignment!.id,
+      answerKey: firstAssignment!.questionSnapshot.correctAnswer,
+      confidenceMode: "safe",
+      useHint: false,
+    });
+
+    const secondRoom = await createRoom({
+      hostName: "Morgan",
+      config: {
+        numberOfRounds: 5,
+        answerTimeLimitSeconds: 15,
+        categoryMode: "host_selects_each_round",
+        enabledCategoryIds: ["category_repeat_guard"],
+        fastestCorrectBonus: false,
+        confidenceWager: false,
+        teamBonus: false,
+        hints: false,
+      },
+    });
+
+    const secondSession = await joinRoom(
+      secondRoom.roomCode,
+      {
+        displayName: "Ava",
+        ageBand: "9_to_11",
+        difficultyMode: "easy",
+        avatarColor: "cyan",
+      },
+      null,
+    );
+
+    await startGame(secondRoom.roomCode, secondRoom.sessionKey);
+    await startRound(secondRoom.roomCode, secondRoom.sessionKey, "category_repeat_guard");
+    const secondAssignment = getStore()
+      .rooms.get(secondRoom.roomCode)
+      ?.rounds.at(-1)
+      ?.assignments.find((entry) => entry.gamePlayerId === secondSession.playerId);
+
+    expect(secondAssignment).toBeDefined();
+    expect(secondAssignment?.questionId).not.toBe(firstAssignment?.questionId);
+  });
 });
