@@ -11,11 +11,47 @@ export interface PersistedRoomStateListEntry extends PersistedRoomState {
   updatedAt: string;
 }
 
+interface QuestionBankQuestionsPage {
+  page: Question[];
+  isDone: boolean;
+  continueCursor: string;
+}
+
 export async function loadQuestionBankFromDatabase() {
-  return runConvexQuery<Record<string, never>, { categories: Category[]; questions: Question[] }>(
-    "questionBank:listQuestionBank",
+  const categories = await runConvexQuery<Record<string, never>, Category[]>(
+    "questionBank:listQuestionBankCategories",
     {},
   );
+
+  const questions: Question[] = [];
+  let cursor: string | null = null;
+
+  while (true) {
+    const result: QuestionBankQuestionsPage = await runConvexQuery<
+      {
+        paginationOpts: {
+          numItems: number;
+          cursor: string | null;
+        };
+      },
+      QuestionBankQuestionsPage
+    >("questionBank:listQuestionBankQuestionsPage", {
+      paginationOpts: {
+        numItems: 500,
+        cursor,
+      },
+    });
+
+    questions.push(...result.page);
+
+    if (result.isDone) {
+      break;
+    }
+
+    cursor = result.continueCursor;
+  }
+
+  return { categories, questions };
 }
 
 export async function loadRoomStateFromDatabase(roomCode: string): Promise<PersistedRoomState | null> {

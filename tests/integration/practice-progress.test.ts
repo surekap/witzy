@@ -144,4 +144,41 @@ describe("practice progress", () => {
 
     expect(selected?.id).toBe(fractionQuestion.id);
   });
+
+  it("returns no question when the selected age band has no seeded matches", () => {
+    const category: Category = {
+      id: "category_creative",
+      slug: "creative-expression",
+      name: "Creative Expression",
+      icon: "🎨",
+      active: true,
+    };
+
+    const olderQuestion = buildQuestion({
+      id: "question_older_age_only",
+      categoryId: category.id,
+      ageBandMin: "9_to_11",
+      ageBandMax: "9_to_11",
+      difficulty: "easy",
+    });
+
+    const selected = selectPracticeQuestionForAccount({
+      category,
+      questions: [olderQuestion],
+      ageBand: "6_to_8",
+      targetDifficulty: "easy",
+      askedQuestionIds: [],
+      progress: {
+        totalAnswered: 0,
+        totalCorrect: 0,
+        totalIncorrect: 0,
+        currentStreak: 0,
+        questionStats: {},
+        signalStats: {},
+        categoryStats: {},
+      },
+    });
+
+    expect(selected).toBeNull();
+  });
 });

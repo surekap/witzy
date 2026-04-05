@@ -14,6 +14,7 @@
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
     "db:init": "tsx scripts/init-schema.ts",
+    "datasets:download": "tsx scripts/download-question-datasets.ts",
     "seed": "tsx scripts/seed.ts",
     "import:questions": "tsx scripts/import-questions.ts",
     "snapshot:export": "tsx scripts/export-runtime-snapshot.ts",
