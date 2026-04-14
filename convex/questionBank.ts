@@ -83,36 +83,6 @@ function mapQuestionRow(question: any) {
   };
 }
 
-export const listQuestionBank = queryGeneric({
-  args: {},
-  handler: async (ctx) => {
-    const currentVersion = await getCurrentQuestionBankVersion(ctx);
-
-    if (!currentVersion) {
-      return {
-        categories: [],
-        questions: [],
-      };
-    }
-
-    const [categories, questions] = await Promise.all([
-      ctx.db.query("categories").withIndex("by_bank_version", (query) => query.eq("bankVersion", currentVersion)).collect(),
-      ctx.db.query("questions").withIndex("by_bank_version", (query) => query.eq("bankVersion", currentVersion)).collect(),
-    ]);
-
-    return {
-      categories: categories
-        .filter((category: any) => category.active)
-        .sort((left: any, right: any) => left.name.localeCompare(right.name))
-        .map(mapCategoryRow),
-      questions: questions
-        .filter((question: any) => question.active)
-        .sort((left: any, right: any) => left.questionId.localeCompare(right.questionId))
-        .map(mapQuestionRow),
-    };
-  },
-});
-
 export const listQuestionBankCategories = queryGeneric({
   args: {},
   handler: async (ctx) => {
