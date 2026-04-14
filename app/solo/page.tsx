@@ -3,6 +3,8 @@ import { getCategories } from "@/lib/game/service";
 import { getPracticeSessionAccountId } from "@/lib/practice/session";
 import { getPracticeAccountProfile } from "@/lib/practice/service";
 
+export const dynamic = "force-dynamic";
+
 export default async function SoloPage() {
   const accountId = await getPracticeSessionAccountId();
   const account = accountId ? await getPracticeAccountProfile(accountId) : null;
