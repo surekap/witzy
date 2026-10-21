@@ -1,4 +1,4 @@
-import { mutationGeneric, queryGeneric } from "convex/server";
+import { internalMutationGeneric as mutationGeneric, internalQueryGeneric as queryGeneric } from "convex/server";
 import { v } from "convex/values";
 
 const nullableString = v.union(v.string(), v.null());

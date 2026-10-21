@@ -74,7 +74,8 @@ export function AdminPanel({
       return;
     }
 
-    void fetchDashboard();
+    const id = window.setTimeout(() => void fetchDashboard(), 0);
+    return () => window.clearTimeout(id);
   }, [signedIn]);
 
   const filteredQuestions = useMemo(() => {

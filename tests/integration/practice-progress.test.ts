@@ -56,7 +56,7 @@ describe("practice progress", () => {
     }
   });
 
-  it("retires a question after the account answers it correctly", async () => {
+  it("deprioritizes a correct answer without declaring mastery after one guess", async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), "kids-quiz-practice-"));
     const store = createPracticeStore(path.join(tempDir, "practice.json"));
     const account = await registerPracticeAccount(
@@ -97,6 +97,7 @@ describe("practice progress", () => {
     );
 
     expect(next.question.id).not.toBe(first.question.id);
+    expect(next.lifetimeProgress.masteredCount).toBe(0);
   });
 
   it("prioritizes question types that have a stronger miss history", () => {

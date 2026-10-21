@@ -46,7 +46,9 @@ export interface Question {
 
 export interface GameConfig {
   numberOfRounds: 5 | 10 | 15;
-  answerTimeLimitSeconds: 10 | 15 | 20;
+  answerTimeLimitSeconds: "auto" | "relaxed" | 10 | 15 | 20 | 30 | 45 | 60 | 90;
+  questionMode?: "quick" | "extended";
+  equalBasePoints?: boolean;
   categoryMode: CategoryMode;
   enabledCategoryIds: string[];
   fastestCorrectBonus: boolean;
@@ -56,6 +58,7 @@ export interface GameConfig {
 }
 
 export interface GamePlayer {
+  viewToken?: string;
   id: string;
   displayName: string;
   ageBand: AgeBand;
@@ -124,6 +127,8 @@ export interface GameRound {
 }
 
 export interface GameRoom {
+  hostViewToken?: string;
+  categorySnapshots?: Category[];
   id: string;
   roomCode: string;
   hostName: string;
@@ -178,6 +183,7 @@ export interface CurrentRoundView {
   categoryId: string;
   categoryName: string;
   endsAt: string | null;
+  startedAt: string | null;
   answerStats: {
     totalPlayers: number;
     answeredPlayers: number;
@@ -193,6 +199,9 @@ export interface RevealedRoundView {
 }
 
 export interface RoomStateView {
+  serverNow: number;
+  subscriptionToken?: string;
+  revision?: number;
   room: {
     id: string;
     roomCode: string;

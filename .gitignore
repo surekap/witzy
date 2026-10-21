@@ -11,6 +11,7 @@ test-results
 tsconfig.tsbuildinfo
 .DS_Store
 .env*.local
+anthropic/key
 .data
 .playwright-mcp/**
 /data/external/question-datasets/raw/**

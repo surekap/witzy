@@ -3,6 +3,7 @@ import { z } from "zod";
 import { setAdminSession } from "@/lib/admin/session";
 import { jsonError } from "@/lib/utils/http";
 import { requireAdminPanelPassword } from "@/lib/utils/env";
+import { authRateLimit } from "@/lib/utils/auth-rate-limit";
 
 const loginSchema = z.object({
   password: z.string().min(1),
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
   }
 
   let expectedPassword: string;
+  const limited = await authRateLimit(request, "admin");
+  if (limited) return limited;
   try {
     expectedPassword = requireAdminPanelPassword();
   } catch (error) {

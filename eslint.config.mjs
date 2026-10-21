@@ -9,6 +9,7 @@ const config = [
       "node_modules/**",
       "playwright-report/**",
       "test-results/**",
+      "convex/_generated/**",
     ],
   },
 ];

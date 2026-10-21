@@ -7,12 +7,20 @@ import {
   insertRoomStateIntoDatabase,
   loadAllRoomStatesFromDatabase,
   loadQuestionBankFromDatabase,
+  loadQuickQuestionsFromDatabase,
+  loadCategoriesFromDatabase,
   loadRoomStateFromDatabase,
   updateRoomStateInDatabase,
 } from "@/lib/db/runtime-storage";
 import { recordQuestionFlag } from "@/lib/question-flags/service";
 import { scoreRoundAnswers } from "@/lib/scoring/score-round";
 import { getStore } from "@/lib/game/store";
+import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
+import { recordRoomAnswer } from "@/lib/game/answer";
+import { buildQuickQuestions } from "@/lib/questions/quick-bank";
+import { isQuickQuestion, questionWordCount } from "@/lib/questions/quality";
+import { shuffleQuestionOptions } from "@/lib/questions/shuffle";
+import { ROUND_PREPARE_MS, SUBMISSION_GRACE_MS, roundDurationSeconds, type TimingSample } from "@/lib/game/timing";
 import { env } from "@/lib/utils/env";
 import { createId, createRoomCode, createSessionKey, stableIndex } from "@/lib/utils/ids";
 import type {
@@ -43,7 +51,8 @@ export class GameError extends Error {
 }
 
 function getCategoryById(categoryId: string) {
-  return getStore().categories.find((category) => category.id === categoryId) ?? null;
+  return getStore().categories.find((category) => category.id === categoryId) ??
+    [...getStore().rooms.values()].flatMap((room) => room.categorySnapshots ?? []).find((category) => category.id === categoryId) ?? null;
 }
 
 function getRoomOrThrow(roomCode: string) {
@@ -84,7 +93,6 @@ function resolveViewer(room: GameRoom, sessionKey: string | null): RoomViewer {
   if (sessionKey) {
     const player = room.players.find((entry) => entry.sessionKey === sessionKey);
     if (player) {
-      touchPlayer(player);
       return {
         role: "player",
         playerId: player.id,
@@ -161,8 +169,8 @@ function getAgeBandLabel(ageBand: AgeBand) {
   return "15+ years";
 }
 
-function normalizePlayerHistoryKey(displayName: string, ageBand: AgeBand) {
-  return `${displayName.trim().toLowerCase()}::${ageBand}`;
+function normalizePlayerHistoryKey(playerId: string, ageBand: AgeBand) {
+  return `${playerId}::${ageBand}`;
 }
 
 type HistoricalQuestionHistory = {
@@ -182,7 +190,7 @@ function buildHistoricalQuestionHistory(rooms: Iterable<GameRoom>) {
           continue;
         }
 
-        const key = normalizePlayerHistoryKey(player.displayName, player.ageBand);
+        const key = normalizePlayerHistoryKey(player.id, player.ageBand);
         const existing = historyByPlayer.get(key) ?? {
           seenQuestionIds: new Set<string>(),
           correctlyAnsweredQuestionIds: new Set<string>(),
@@ -286,6 +294,10 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
   const winner = room.status === "finished" ? leaderboard[0] ?? null : null;
 
   return {
+    serverNow: Date.now(),
+    ...(viewer.role === "host" && room.hostViewToken ? { subscriptionToken: room.hostViewToken } : {}),
+    ...(viewer.role === "player" && room.players.find((player) => player.id === viewer.playerId)?.viewToken
+      ? { subscriptionToken: room.players.find((player) => player.id === viewer.playerId)!.viewToken } : {}),
     room: {
       id: room.id,
       roomCode: room.roomCode,
@@ -317,6 +329,7 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
             categoryId: currentRound.categoryId,
             categoryName: currentCategory.name,
             endsAt: currentRound.endsAt,
+            startedAt: currentRound.startedAt,
             answerStats: {
               totalPlayers: room.players.length,
               answeredPlayers: currentRound.assignments.filter((entry) => entry.answer !== null).length,
@@ -339,11 +352,11 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
             submittedAnswer: playerQuestion.answer?.submittedAnswer ?? null,
             confidenceMode: playerQuestion.confidenceMode,
             hintUsed: playerQuestion.hintUsed,
-            hintRemoves: (["A", "B", "C", "D"] as const).filter(
+            hintRemoves: playerQuestion.hintUsed ? (["A", "B", "C", "D"] as const).filter(
               (key) =>
                 key !== playerQuestion.questionSnapshot.correctAnswer &&
                 playerQuestion.questionSnapshot.options[key],
-            ).slice(0, 2),
+            ).slice(0, 2) : [],
             locked: playerQuestion.answer !== null || currentRound?.status !== "active",
             hintsRemaining: room.players.find((player) => player.id === viewer.playerId)?.hintUsesRemaining ?? 0,
           }
@@ -380,8 +393,9 @@ function scoreRound(room: GameRoom, round: GameRound) {
       hintUsed: assignment.hintUsed,
     })),
     {
-      fastestCorrectBonus: room.config.fastestCorrectBonus,
+      fastestCorrectBonus: room.config.fastestCorrectBonus && new Set(room.players.map((player) => player.ageBand)).size === 1,
       teamBonus: room.config.teamBonus,
+      equalBasePoints: room.config.equalBasePoints,
     },
   );
 
@@ -454,7 +468,7 @@ function synchronizeRound(room: GameRoom) {
     return;
   }
 
-  const hasExpired = Date.now() >= new Date(round.endsAt).getTime();
+  const hasExpired = Date.now() > new Date(round.endsAt).getTime() + SUBMISSION_GRACE_MS;
   const everyoneAnswered = round.assignments.every((assignment) => assignment.answer !== null);
 
   if (hasExpired || everyoneAnswered) {
@@ -476,6 +490,8 @@ function createRoomInMemory(input: { hostName: string; config: GameConfig }) {
     roomCode,
     hostName: input.hostName.trim(),
     hostSessionKey: createSessionKey(),
+    hostViewToken: createSessionKey(),
+    categorySnapshots: store.categories.filter((category) => input.config.enabledCategoryIds.includes(category.id)),
     status: "lobby",
     config: input.config,
     currentRoundNumber: 0,
@@ -505,6 +521,11 @@ function joinRoomInMemory(
 ) {
   const room = getRoomOrThrow(roomCode);
 
+  const returningPlayer = room.players.find((player) => existingSessionKey && player.sessionKey === existingSessionKey);
+  if (returningPlayer) {
+    touchPlayer(returningPlayer);
+    return { roomCode: room.roomCode, sessionKey: returningPlayer.sessionKey, playerId: returningPlayer.id };
+  }
   if (room.status !== "lobby") {
     throw new GameError("This room has already started, so new players can't join right now.", 409);
   }
@@ -528,17 +549,11 @@ function joinRoomInMemory(
       throw new GameError("Someone is already using that player name in this room.", 409);
     }
 
-    matchingPlayer.sessionKey = createSessionKey();
-    touchPlayer(matchingPlayer);
-
-    return {
-      roomCode: room.roomCode,
-      sessionKey: matchingPlayer.sessionKey,
-      playerId: matchingPlayer.id,
-    };
+    throw new GameError("That name belongs to another player. Please choose a different name.", 409);
   }
 
   const player: GamePlayer = {
+    viewToken: createSessionKey(),
     id: createId("player"),
     displayName: normalizedName,
     ageBand: input.ageBand,
@@ -566,6 +581,7 @@ function joinRoomInMemory(
 function startGameInMemory(roomCode: string, sessionKey: string | null) {
   const room = getRoomOrThrow(roomCode);
   ensureHost(room, sessionKey);
+  if (room.status !== "lobby") return buildRoomView(room, resolveViewer(room, sessionKey));
 
   if (room.players.length === 0) {
     throw new GameError("Invite at least one player before starting the game.", 400);
@@ -608,7 +624,9 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
   );
   const historicalQuestionHistory = buildHistoricalQuestionHistory(getStore().rooms.values());
 
-  const questions = getStore().questions;
+  const questions = room.config.questionMode === "quick"
+    ? [...getStore().questions, ...(env.USE_MEMORY_STORE ? buildQuickQuestions(getStore().categories) : [])].filter(isQuickQuestion)
+    : getStore().questions;
   const missingAgeBands = getMissingAgeBandsForCategory({
     categoryId,
     players: room.players,
@@ -625,15 +643,18 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
 
   const assignments = room.players.map((player) => {
     const targetDifficulty = resolvePlayerDifficulty(player);
-    const historicalKey = normalizePlayerHistoryKey(player.displayName, player.ageBand);
-    const correctlyAnsweredQuestionIds =
+    const historicalKey = normalizePlayerHistoryKey(player.id, player.ageBand);
+    const correctlyAnsweredQuestionIds = room.config.questionMode === "quick" ? new Set<string>() :
       historicalQuestionHistory.get(historicalKey)?.correctlyAnsweredQuestionIds ?? new Set<string>();
     const usedAndMasteredQuestionIds = new Set([
       ...usedQuestionIds,
       ...correctlyAnsweredQuestionIds,
     ]);
+    const unseenForPlayer = questions.filter((candidate) => candidate.categoryId === categoryId &&
+      isQuestionAgeCompatible(candidate, player.ageBand) &&
+      !historicalQuestionHistory.get(historicalKey)?.seenQuestionIds.has(candidate.id));
     const question = assignQuestionForPlayer({
-      questions,
+      questions: room.config.questionMode === "quick" && unseenForPlayer.length ? unseenForPlayer : questions,
       categoryId,
       ageBand: player.ageBand,
       targetDifficulty,
@@ -677,7 +698,7 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
       id: createId("assigned"),
       gamePlayerId: player.id,
       questionId: question.id,
-      questionSnapshot: question,
+      questionSnapshot: shuffleQuestionOptions(question),
       assignedDifficulty: question.difficulty,
       confidenceMode: null,
       hintUsed: false,
@@ -685,8 +706,23 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
     };
   });
 
-  const startedAt = new Date();
-  const endsAt = new Date(startedAt.getTime() + room.config.answerTimeLimitSeconds * 1000);
+  const timingSamples = getStore().timingSamples ?? room.rounds.filter((round) => round.status === "revealed").flatMap((round) =>
+    round.assignments.filter((assignment) => !assignment.hintUsed && isQuickQuestion(assignment.questionSnapshot) && assignment.questionSnapshot.modality === "text" &&
+      (assignment.answer?.isCorrect || (assignment.answer?.submittedAnswer === null && Date.parse(round.lockedAt!) >= Date.parse(round.endsAt!)))).map((assignment) => ({
+      ageBand: room.players.find((player) => player.id === assignment.gamePlayerId)!.ageBand,
+      difficulty: assignment.questionSnapshot.difficulty,
+      words: questionWordCount(assignment.questionSnapshot),
+      seconds: assignment.answer?.responseMs != null ? assignment.answer.responseMs / 1000 : (Date.parse(round.endsAt!) - Date.parse(round.startedAt!)) / 1000,
+      timedOut: assignment.answer?.submittedAnswer === null,
+    })),
+  );
+  const duration = roundDurationSeconds(assignments.map((assignment) => ({
+    question: assignment.questionSnapshot,
+    ageBand: room.players.find((player) => player.id === assignment.gamePlayerId)!.ageBand,
+  })), room.config, room.config.questionMode === "quick" ? timingSamples : []);
+  const prepareMs = typeof room.config.answerTimeLimitSeconds === "string" ? ROUND_PREPARE_MS : 0;
+  const startedAt = new Date(Date.now() + prepareMs);
+  const endsAt = new Date(startedAt.getTime() + duration * 1000);
 
   room.currentRoundNumber += 1;
   room.rounds.push({
@@ -716,48 +752,10 @@ function submitAnswerInMemory(
     confidenceMode?: ConfidenceMode;
     useHint?: boolean;
   },
+  receivedAt = Date.now(),
 ) {
   const room = getRoomOrThrow(roomCode);
-  const player = getPlayerBySession(room, sessionKey);
-  synchronizeRound(room);
-
-  const round = getCurrentRound(room);
-  if (!round || round.status !== "active") {
-    throw new GameError("That round is no longer accepting answers.", 409);
-  }
-
-  const assignment = round.assignments.find((entry) => entry.id === input.assignedQuestionId);
-  if (!assignment || assignment.gamePlayerId !== player.id) {
-    throw new GameError("That question isn't assigned to you.", 403);
-  }
-
-  if (assignment.answer) {
-    throw new GameError("You already locked in an answer for this question.", 409);
-  }
-
-  if (input.useHint && room.config.hints && player.hintUsesRemaining <= 0) {
-    throw new GameError("You already used your hint for this game.", 409);
-  }
-
-  if (input.useHint && room.config.hints) {
-    assignment.hintUsed = true;
-    player.hintUsesRemaining -= 1;
-  }
-
-  assignment.confidenceMode = room.config.confidenceWager ? input.confidenceMode ?? "safe" : null;
-
-  const startedTimestamp = round.startedAt ? new Date(round.startedAt).getTime() : Date.now();
-  const responseMs = Math.max(0, Date.now() - startedTimestamp);
-
-  assignment.answer = {
-    submittedAnswer: input.answerKey,
-    isCorrect: input.answerKey === assignment.questionSnapshot.correctAnswer,
-    responseMs,
-    pointsAwarded: 0,
-    answeredAt: new Date().toISOString(),
-  };
-
-  room.updatedAt = new Date().toISOString();
+  recordRoomAnswer(room, sessionKey, input, receivedAt);
   synchronizeRound(room);
 
   return buildRoomView(room, resolveViewer(room, sessionKey));
@@ -899,11 +897,15 @@ async function withScratchStore<T>(
   options: {
     roomCode?: string;
     includeAllRooms?: boolean;
+    needsQuestions?: boolean;
   },
   callback: () => T,
 ) {
   const previousStore = globalThis.__kidsQuizStore;
-  const { categories, questions } = await loadQuestionBankFromDatabase();
+  const { categories, questions } = options.needsQuestions
+    ? await loadQuestionBankFromDatabase()
+    : { categories: await loadCategoriesFromDatabase(), questions: [] as Question[] };
+  if (options.needsQuestions) questions.push(...await loadQuickQuestionsFromDatabase(categories));
   const rooms = new Map<string, GameRoom>();
   let version: number | null = null;
 
@@ -937,6 +939,7 @@ async function withScratchStore<T>(
     categories,
     questions,
     rooms,
+    ...(options.needsQuestions ? { timingSamples: await runConvexQuery<Record<string, never>, TimingSample[]>("rooms:listTimingObservations", {}) } : {}),
   };
 
   try {
@@ -952,13 +955,13 @@ async function withScratchStore<T>(
   }
 }
 
-async function withPersistedRoom<T>(roomCode: string, callback: () => T) {
+async function withPersistedRoom<T>(roomCode: string, callback: () => T, needsQuestions = false) {
   let attempts = 0;
 
   while (attempts < RUNTIME_ROOM_RETRIES) {
     attempts += 1;
 
-    const { result, rooms, version } = await withScratchStore({ roomCode }, callback);
+    const { result, rooms, version } = await withScratchStore({ roomCode, needsQuestions }, callback);
     const updatedRoom = rooms.get(roomCode.toUpperCase());
 
     if (!updatedRoom || version === null) {
@@ -967,31 +970,7 @@ async function withPersistedRoom<T>(roomCode: string, callback: () => T) {
 
     const nextVersion = await updateRoomStateInDatabase(updatedRoom, version);
     if (nextVersion !== null) {
-      return result;
-    }
-  }
-
-  throw new GameError("That room changed while this action was running. Please try again.", 409);
-}
-
-async function withPersistedRoomAndHistory<T>(roomCode: string, callback: () => T) {
-  let attempts = 0;
-
-  while (attempts < RUNTIME_ROOM_RETRIES) {
-    attempts += 1;
-
-    const { result, rooms, version } = await withScratchStore(
-      { roomCode, includeAllRooms: true },
-      callback,
-    );
-    const updatedRoom = rooms.get(roomCode.toUpperCase());
-
-    if (!updatedRoom || version === null) {
-      throw new GameError("That room code doesn't exist yet.", 404);
-    }
-
-    const nextVersion = await updateRoomStateInDatabase(updatedRoom, version);
-    if (nextVersion !== null) {
+      if (result && typeof result === "object" && "serverNow" in result) Object.assign(result, { revision: nextVersion });
       return result;
     }
   }
@@ -1000,7 +979,7 @@ async function withPersistedRoomAndHistory<T>(roomCode: string, callback: () => 
 }
 
 export async function createRoom(input: { hostName: string; config: GameConfig }) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return createRoomInMemory(input);
   }
 
@@ -1041,7 +1020,7 @@ export async function joinRoom(
   },
   existingSessionKey: string | null,
 ) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return joinRoomInMemory(roomCode, input, existingSessionKey);
   }
 
@@ -1049,7 +1028,7 @@ export async function joinRoom(
 }
 
 export async function startGame(roomCode: string, sessionKey: string | null) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return startGameInMemory(roomCode, sessionKey);
   }
 
@@ -1057,12 +1036,13 @@ export async function startGame(roomCode: string, sessionKey: string | null) {
 }
 
 export async function startRound(roomCode: string, sessionKey: string | null, requestedCategoryId?: string) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return startRoundInMemory(roomCode, sessionKey, requestedCategoryId);
   }
 
-  return withPersistedRoomAndHistory(roomCode, () =>
+  return withPersistedRoom(roomCode, () =>
     startRoundInMemory(roomCode, sessionKey, requestedCategoryId),
+    true,
   );
 }
 
@@ -1075,24 +1055,56 @@ export async function submitAnswer(
     confidenceMode?: ConfidenceMode;
     useHint?: boolean;
   },
+  receivedAt = Date.now(),
 ) {
-  if (env.NODE_ENV === "test") {
-    return submitAnswerInMemory(roomCode, sessionKey, input);
+  if (env.USE_MEMORY_STORE) {
+    return submitAnswerInMemory(roomCode, sessionKey, input, receivedAt);
   }
 
-  return withPersistedRoom(roomCode, () => submitAnswerInMemory(roomCode, sessionKey, input));
+  if (!sessionKey) throw new GameError("Join this room before answering.", 403);
+  await runConvexMutation("rooms:submitAnswer", { roomCode: roomCode.toUpperCase(), sessionKey, ...input });
+  return getRoomState(roomCode, sessionKey);
 }
 
 export async function lockRound(roomCode: string, sessionKey: string | null) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return lockRoundInMemory(roomCode, sessionKey);
   }
 
   return withPersistedRoom(roomCode, () => lockRoundInMemory(roomCode, sessionKey));
 }
 
+export async function applyRoomHint(roomCode: string, sessionKey: string | null, assignedQuestionId: string) {
+  const action = () => {
+    const room = getRoomOrThrow(roomCode);
+    const player = getPlayerBySession(room, sessionKey);
+    const round = getCurrentRound(room);
+    const assignment = round?.assignments.find((entry) => entry.id === assignedQuestionId && entry.gamePlayerId === player.id);
+    if (!assignment || round?.status !== "active" || !round.endsAt || Date.now() >= Date.parse(round.endsAt) || assignment.answer) {
+      throw new GameError("Hints are not available for this question now.", 409);
+    }
+    if (!room.config.hints) throw new GameError("Hints are disabled.", 403);
+    if (!assignment.hintUsed) {
+      if (player.hintUsesRemaining <= 0) throw new GameError("You already used your hint.", 409);
+      assignment.hintUsed = true;
+      player.hintUsesRemaining -= 1;
+    }
+    return buildRoomView(room, resolveViewer(room, sessionKey));
+  };
+  return env.USE_MEMORY_STORE ? action() : withPersistedRoom(roomCode, action);
+}
+
+export async function heartbeatRoom(roomCode: string, sessionKey: string | null) {
+  const action = () => {
+    const room = getRoomOrThrow(roomCode);
+    touchPlayer(getPlayerBySession(room, sessionKey));
+    return { ok: true };
+  };
+  return env.USE_MEMORY_STORE ? action() : withPersistedRoom(roomCode, action);
+}
+
 export async function revealRound(roomCode: string, sessionKey: string | null) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return revealRoundInMemory(roomCode, sessionKey);
   }
 
@@ -1100,19 +1112,30 @@ export async function revealRound(roomCode: string, sessionKey: string | null) {
 }
 
 export async function getRoomState(roomCode: string, sessionKey: string | null) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return getRoomStateInMemory(roomCode, sessionKey);
   }
 
-  return withPersistedRoom(roomCode, () => getRoomStateInMemory(roomCode, sessionKey));
+  for (let attempt = 0; attempt < RUNTIME_ROOM_RETRIES; attempt += 1) {
+    let statusBefore: string | undefined;
+    const { result, rooms, version } = await withScratchStore({ roomCode }, () => {
+      statusBefore = getCurrentRound(getRoomOrThrow(roomCode))?.status;
+      return getRoomStateInMemory(roomCode, sessionKey);
+    });
+    // Ordinary reads never rewrite room state. Only deadline transitions persist.
+    if (statusBefore === result.currentRound?.status) return { ...result, revision: version ?? 0 };
+    const nextVersion = await updateRoomStateInDatabase(rooms.get(roomCode.toUpperCase())!, version!);
+    if (nextVersion !== null) return { ...result, revision: nextVersion };
+  }
+  throw new GameError("Room is busy. Please retry.", 409);
 }
 
 export async function getLeaderboard(roomCode: string) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return getLeaderboardInMemory(roomCode);
   }
 
-  return withPersistedRoom(roomCode, () => getLeaderboardInMemory(roomCode));
+  return (await getRoomState(roomCode, null)).leaderboard;
 }
 
 export async function flagRoomQuestion(
@@ -1122,7 +1145,7 @@ export async function flagRoomQuestion(
     assignedQuestionId: string;
   },
 ) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return flagRoomQuestionInMemory(roomCode, sessionKey, input);
   }
 
@@ -1138,19 +1161,18 @@ export async function getSoloQuestion(input: {
   difficultyMode?: GamePlayer["difficultyMode"];
   askedQuestionIds: string[];
 }) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return getSoloQuestionInMemory(input);
   }
 
-  const { result } = await withScratchStore({}, () => getSoloQuestionInMemory(input));
+  const { result } = await withScratchStore({ needsQuestions: true }, () => getSoloQuestionInMemory(input));
   return result;
 }
 
 export async function getCategories() {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return getCategoriesInMemory();
   }
 
-  const { categories } = await loadQuestionBankFromDatabase();
-  return categories;
+  return loadCategoriesFromDatabase();
 }

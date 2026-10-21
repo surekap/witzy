@@ -4,6 +4,12 @@ import { v } from "convex/values";
 const nullableString = v.union(v.string(), v.null());
 
 export default defineSchema({
+  timingObservations: defineTable({ ageBand: v.string(), difficulty: v.string(), words: v.number(), seconds: v.number(), timedOut: v.boolean(), createdAt: v.number() })
+    .index("by_created_at", ["createdAt"]),
+  rateLimits: defineTable({ key: v.string(), count: v.number(), resetsAt: v.number() })
+    .index("by_key", ["key"]).index("by_reset", ["resetsAt"]),
+  revokedSessions: defineTable({ tokenHash: v.string(), expiresAt: v.number() })
+    .index("by_token", ["tokenHash"]).index("by_expiry", ["expiresAt"]),
   settings: defineTable({
     key: v.string(),
     stringValue: nullableString,
@@ -55,7 +61,7 @@ export default defineSchema({
     room: v.any(),
     version: v.number(),
     updatedAt: v.string(),
-  }).index("by_room_code", ["roomCode"]),
+  }).index("by_room_code", ["roomCode"]).index("by_updated_at", ["updatedAt"]),
 
   users: defineTable({
     accountId: v.string(),
@@ -71,6 +77,7 @@ export default defineSchema({
     .index("by_username_lower", ["usernameLower"]),
 
   practiceAttempts: defineTable({
+    attemptId: v.optional(v.string()),
     accountId: v.string(),
     questionId: v.string(),
     submittedAnswer: v.string(),
@@ -78,6 +85,7 @@ export default defineSchema({
     answeredAt: v.string(),
   })
     .index("by_account_answered_at", ["accountId", "answeredAt"])
+    .index("by_attempt_id", ["attemptId"])
     .index("by_question_id", ["questionId"]),
 
   questionFlags: defineTable({
@@ -93,5 +101,6 @@ export default defineSchema({
     reportedAt: v.string(),
   })
     .index("by_question_id", ["questionId"])
-    .index("by_question_and_reporter", ["questionId", "reporterKey"]),
+    .index("by_question_and_reporter", ["questionId", "reporterKey"])
+    .index("by_reported_at", ["reportedAt"]),
 });

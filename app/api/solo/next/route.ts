@@ -2,6 +2,8 @@ import { soloQuestionSchema } from "@/lib/game/validators";
 import { getSoloPracticeQuestion, PracticeError } from "@/lib/practice/service";
 import { getPracticeSessionAccountId } from "@/lib/practice/session";
 import { jsonError } from "@/lib/utils/http";
+import { issuePracticeTicket, publicPracticeQuestion } from "@/lib/practice/ticket";
+import { shuffleQuestionOptions } from "@/lib/questions/shuffle";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -17,7 +19,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await getSoloPracticeQuestion(accountId, parsed.data));
+    const result = await getSoloPracticeQuestion(accountId, parsed.data);
+    const question = shuffleQuestionOptions(result.question);
+    return Response.json({ ...result, question: publicPracticeQuestion(question), ticket: issuePracticeTicket(accountId, question) });
   } catch (error) {
     if (error instanceof PracticeError) {
       return jsonError(error.message, error.status);

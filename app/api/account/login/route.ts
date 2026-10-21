@@ -2,6 +2,7 @@ import { practiceAuthSchema } from "@/lib/game/validators";
 import { loginPracticeAccount, PracticeError } from "@/lib/practice/service";
 import { setPracticeSession } from "@/lib/practice/session";
 import { jsonError } from "@/lib/utils/http";
+import { authRateLimit } from "@/lib/utils/auth-rate-limit";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
   }
 
   try {
+    const limited = await authRateLimit(request, parsed.data.username);
+    if (limited) return limited;
     const account = await loginPracticeAccount(parsed.data);
     await setPracticeSession(account.id);
     return Response.json({ account });

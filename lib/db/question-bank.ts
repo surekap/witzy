@@ -23,6 +23,7 @@ export async function replaceQuestionBank(data: {
   questions: Question[];
 }) {
   const version = createQuestionBankVersion();
+  const expectedVersion = await runConvexQuery<Record<string, never>, string | null>("questionBank:getActiveQuestionBankVersion", {});
 
   for (const categoryBatch of chunk(data.categories, CATEGORY_BATCH_SIZE)) {
     await runConvexMutation<{ version: string; categories: Category[] }, { insertedCount: number }>(
@@ -44,36 +45,17 @@ export async function replaceQuestionBank(data: {
     );
   }
 
-  await runConvexMutation<{ version: string; activatedAt: string }, { version: string }>(
+  await runConvexMutation<{ version: string; activatedAt: string; expectedVersion: string | null }, { version: string }>(
     "questionBank:activateQuestionBankVersion",
     {
       version,
       activatedAt: new Date().toISOString(),
+      expectedVersion,
     },
   );
 
-  const knownVersions = await runConvexQuery<Record<string, never>, string[]>(
-    "questionBank:listQuestionBankVersions",
-    {},
-  );
-  const staleVersions = knownVersions.filter((knownVersion) => knownVersion !== version);
-
-  for (const staleVersion of staleVersions) {
-    while (true) {
-      const result = await runConvexMutation<
-        { version: string; questionChunkSize: number; categoryChunkSize: number },
-        { deletedQuestionCount: number; deletedCategoryCount: number }
-      >("questionBank:deleteQuestionBankVersionChunk", {
-        version: staleVersion,
-        questionChunkSize: 1000,
-        categoryChunkSize: 100,
-      });
-
-      if (result.deletedQuestionCount === 0 && result.deletedCategoryCount === 0) {
-        break;
-      }
-    }
-  }
+  // Retain old versions for rollback and readers pinned to a previous version.
+  // Cleanup is an explicit maintenance operation, never part of publication.
 
   return { version };
 }

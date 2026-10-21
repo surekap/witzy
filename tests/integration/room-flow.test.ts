@@ -251,7 +251,7 @@ describe("room flow", () => {
     expect(result?.pointsAwarded).toBe(3);
   });
 
-  it("avoids re-serving previously correctly answered questions across games", async () => {
+  it("does not share learning history between unrelated players with the same name", async () => {
     const store = getStore();
     store.categories = [
       {
@@ -373,6 +373,7 @@ describe("room flow", () => {
       null,
     );
 
+    store.questions = store.questions.filter((question) => question.id === firstAssignment!.questionId);
     await startGame(secondRoom.roomCode, secondRoom.sessionKey);
     await startRound(secondRoom.roomCode, secondRoom.sessionKey, "category_repeat_guard");
     const secondAssignment = getStore()
@@ -381,6 +382,6 @@ describe("room flow", () => {
       ?.assignments.find((entry) => entry.gamePlayerId === secondSession.playerId);
 
     expect(secondAssignment).toBeDefined();
-    expect(secondAssignment?.questionId).not.toBe(firstAssignment?.questionId);
+    expect(secondAssignment?.questionId).toBe(firstAssignment?.questionId);
   });
 });

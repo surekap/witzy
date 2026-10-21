@@ -1,4 +1,4 @@
-import { mutationGeneric, queryGeneric } from "convex/server";
+import { internalMutationGeneric as mutationGeneric, internalQueryGeneric as queryGeneric } from "convex/server";
 import { v } from "convex/values";
 
 function mapUser(user: {
@@ -160,6 +160,7 @@ export const updateLastLoginAt = mutationGeneric({
 
 export const insertPracticeAttempt = mutationGeneric({
   args: {
+    attemptId: v.optional(v.string()),
     accountId: v.string(),
     questionId: v.string(),
     submittedAnswer: v.string(),
@@ -167,7 +168,15 @@ export const insertPracticeAttempt = mutationGeneric({
     answeredAt: v.string(),
   },
   handler: async (ctx, args) => {
+    if (args.attemptId) {
+      const existing = await ctx.db.query("practiceAttempts").withIndex("by_attempt_id", (q) => q.eq("attemptId", args.attemptId)).unique();
+      if (existing) {
+        if (existing.accountId !== args.accountId || existing.submittedAnswer !== args.submittedAnswer) throw new Error("This question was already answered.");
+        return { saved: true };
+      }
+    }
     await ctx.db.insert("practiceAttempts", {
+      ...(args.attemptId ? { attemptId: args.attemptId } : {}),
       accountId: args.accountId,
       questionId: args.questionId,
       submittedAnswer: args.submittedAnswer,

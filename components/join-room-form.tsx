@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
+import { joinRoomSchema } from "@/lib/game/validators";
 
 import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
 
@@ -22,6 +23,7 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberProfile, setRememberProfile] = useState(false);
   const [formState, setFormState] = useState<JoinRoomState>({
     roomCode: initialRoomCode,
     displayName: "Player",
@@ -30,10 +32,24 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
     avatarColor: "cyan",
   });
 
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("witzy-join-profile-v1") ?? "null");
+        const profile = joinRoomSchema.safeParse(saved);
+        if (profile.success && avatarColors.includes(profile.data.avatarColor as AvatarColor)) {
+          setFormState((state) => ({ ...state, ...profile.data, avatarColor: profile.data.avatarColor as AvatarColor }));
+          setRememberProfile(true);
+        }
+      } catch { /* Storage may be unavailable on shared/private devices. */ }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
   const submit = async () => {
     setIsSubmitting(true);
     setError(null);
-
+    try {
     const response = await fetch(`/api/rooms/${formState.roomCode.toUpperCase()}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,14 +61,19 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
       }),
     });
     const payload = await response.json();
-    setIsSubmitting(false);
 
     if (!response.ok) {
       setError(payload.error ?? "Couldn't join that room.");
       return;
     }
 
+    try {
+      if (rememberProfile) localStorage.setItem("witzy-join-profile-v1", JSON.stringify({ displayName: formState.displayName, ageBand: formState.ageBand, difficultyMode: formState.difficultyMode, avatarColor: formState.avatarColor }));
+      else localStorage.removeItem("witzy-join-profile-v1");
+    } catch { /* Joining does not depend on browser storage. */ }
     router.push(`/game/${payload.roomCode}`);
+    } catch { setError("Couldn't connect. Please try again."); }
+    finally { setIsSubmitting(false); }
   };
 
   return (
@@ -148,6 +169,10 @@ export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
         </div>
 
         {/* ── Avatar color ── */}
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={rememberProfile} onChange={(event) => setRememberProfile(event.target.checked)} />
+          Remember my name and age on this device
+        </label>
         <div>
           <p className="field-label">Avatar colour</p>
           <div className="flex flex-wrap gap-3 mt-2">

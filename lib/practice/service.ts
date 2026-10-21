@@ -1,7 +1,9 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
-import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
+import { buildQuickQuestions } from "@/lib/questions/quick-bank";
+import { isQuickQuestion } from "@/lib/questions/quality";
+import { loadQuestionBankFromDatabase, loadQuickQuestionsFromDatabase } from "@/lib/db/runtime-storage";
 import { isQuestionAgeCompatible, resolvePlayerDifficulty } from "@/lib/questions/assignment";
 import { recordQuestionFlag } from "@/lib/question-flags/service";
 import { getStore } from "@/lib/game/store";
@@ -96,7 +98,8 @@ function getQuestionStats(progress: PracticeProgressRecord, questionId: string) 
 function getMasteredQuestionIds(progress: PracticeProgressRecord) {
   return new Set(
     Object.entries(progress.questionStats)
-      .filter(([, stats]) => stats.correctCount > 0)
+      .filter(([, stats]) => stats.correctCount >= 3 && stats.correctCount > stats.incorrectCount && stats.lastAnswerCorrect !== false &&
+        stats.lastAnsweredAt && Date.now() - Date.parse(stats.lastAnsweredAt) < 7 * 24 * 60 * 60 * 1000)
       .map(([questionId]) => questionId),
   );
 }
@@ -344,6 +347,18 @@ function buildProgressFromAttempts(
   );
 
   for (const attempt of sortedAttempts) {
+    const isCorrect = attempt.isCorrect;
+    const questionStats = getQuestionStats(progress, attempt.questionId);
+    progress.questionStats[attempt.questionId] = {
+      correctCount: questionStats.correctCount + (isCorrect ? 1 : 0),
+      incorrectCount: questionStats.incorrectCount + (isCorrect ? 0 : 1),
+      lastAnsweredAt: attempt.answeredAt,
+      lastAnswerCorrect: isCorrect,
+    };
+    progress.totalAnswered += 1;
+    progress.totalCorrect += isCorrect ? 1 : 0;
+    progress.totalIncorrect += isCorrect ? 0 : 1;
+    progress.currentStreak = updateStreak(progress.currentStreak, isCorrect);
     const question = questionsById.get(attempt.questionId);
     if (!question) {
       continue;
@@ -353,18 +368,6 @@ function buildProgressFromAttempts(
     if (!category) {
       continue;
     }
-
-    const isCorrect = attempt.isCorrect;
-    const questionStats = getQuestionStats(progress, question.id);
-    progress.questionStats[question.id] = {
-      correctCount: questionStats.correctCount + (isCorrect ? 1 : 0),
-      incorrectCount: questionStats.incorrectCount + (isCorrect ? 0 : 1),
-      lastAnsweredAt: attempt.answeredAt,
-    };
-    progress.totalAnswered += 1;
-    progress.totalCorrect += isCorrect ? 1 : 0;
-    progress.totalIncorrect += isCorrect ? 0 : 1;
-    progress.currentStreak = updateStreak(progress.currentStreak, isCorrect);
 
     const categoryStats = progress.categoryStats[category.id] ?? {
       correctCount: 0,
@@ -419,11 +422,12 @@ async function loadRuntimeAccountSnapshot(accountId: string) {
     loadRuntimeAttempts(accountId),
   ]);
 
+  const playableQuestions = [...questions, ...await loadQuickQuestionsFromDatabase(categories)];
   return {
     account,
     categories,
-    questions,
-    progress: buildProgressFromAttempts(attempts, questions, categories),
+    questions: playableQuestions,
+    progress: buildProgressFromAttempts(attempts, playableQuestions, categories),
   };
 }
 
@@ -449,7 +453,7 @@ export async function registerPracticeAccount(input: { username: string; passwor
     throw new PracticeError("Choose a simple password between 4 and 64 characters.", 400);
   }
 
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const passwordSalt = randomBytes(16).toString("hex");
     const passwordHash = hashPassword(password, passwordSalt);
     const timestamp = new Date().toISOString();
@@ -525,7 +529,7 @@ export async function registerPracticeAccount(input: { username: string; passwor
 export async function loginPracticeAccount(input: { username: string; password: string }, store = getPracticeStore()) {
   const username = normalizeUsername(input.username);
 
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const account = await loadRuntimeAccountByUsername(username);
 
     if (!account || !account.passwordHash || !account.passwordSalt) {
@@ -582,7 +586,7 @@ export async function loginPracticeAccount(input: { username: string; password: 
 }
 
 export async function getPracticeAccountProfile(accountId: string, store = getPracticeStore()) {
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const snapshot = await loadRuntimeAccountSnapshot(accountId);
     return snapshot ? toRuntimeAccountProfile(snapshot) : null;
   }
@@ -603,10 +607,11 @@ export async function getSoloPracticeQuestion(
     ageBand: AgeBand;
     difficultyMode?: DifficultyMode;
     askedQuestionIds: string[];
+    questionMode?: "quick" | "extended";
   },
   store = getPracticeStore(),
 ) {
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const snapshot = await loadRuntimeAccountSnapshot(accountId);
     if (!snapshot) {
       throw new PracticeError("Please sign in again to continue practice.", 401);
@@ -614,7 +619,7 @@ export async function getSoloPracticeQuestion(
 
     const category = findCategoryOrThrow(input.categoryId, snapshot.categories);
     const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
-      questions: snapshot.questions,
+      questions: input.questionMode === "quick" ? snapshot.questions.filter(isQuickQuestion) : snapshot.questions,
       categoryId: category.id,
       ageBand: input.ageBand,
     });
@@ -635,7 +640,7 @@ export async function getSoloPracticeQuestion(
 
     const question = selectPracticeQuestionForAccount({
       category,
-      questions: snapshot.questions,
+      questions: input.questionMode === "quick" ? snapshot.questions.filter(isQuickQuestion) : snapshot.questions,
       ageBand: input.ageBand,
       targetDifficulty,
       askedQuestionIds: input.askedQuestionIds,
@@ -659,8 +664,9 @@ export async function getSoloPracticeQuestion(
   const account = await getAccountOrThrow(accountId, store);
   const { questions, categories } = getStore();
   const category = findCategoryOrThrow(input.categoryId, categories);
+  const practiceQuestions = input.questionMode === "quick" ? [...questions, ...buildQuickQuestions(categories)].filter(isQuickQuestion) : questions;
   const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
-    questions,
+    questions: practiceQuestions,
     categoryId: category.id,
     ageBand: input.ageBand,
   });
@@ -682,7 +688,7 @@ export async function getSoloPracticeQuestion(
 
   const question = selectPracticeQuestionForAccount({
     category,
-    questions,
+    questions: practiceQuestions,
     ageBand: input.ageBand,
     targetDifficulty,
     askedQuestionIds: input.askedQuestionIds,
@@ -708,21 +714,24 @@ export async function submitPracticeAnswer(
   input: {
     questionId: string;
     answerKey: "A" | "B" | "C" | "D";
+    issuedQuestion?: Question;
+    attemptId?: string;
   },
   store = getPracticeStore(),
 ) {
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const snapshot = await loadRuntimeAccountSnapshot(accountId);
     if (!snapshot) {
       throw new PracticeError("Please sign in again to continue practice.", 401);
     }
 
-    const question = snapshot.questions.find((candidate) => candidate.id === input.questionId);
+    const question = input.issuedQuestion ?? snapshot.questions.find((candidate) => candidate.id === input.questionId);
     if (!question) {
       throw new PracticeError("That practice question could not be found.", 404);
     }
 
     const isCorrect = question.correctAnswer === input.answerKey;
+    if (!question.options[input.answerKey]) throw new PracticeError("Choose one of the displayed answers.", 400);
     await runConvexMutation<
       {
         accountId: string;
@@ -730,6 +739,7 @@ export async function submitPracticeAnswer(
         submittedAnswer: string;
         isCorrect: boolean;
         answeredAt: string;
+        attemptId?: string;
       },
       { saved: boolean }
     >("practice:insertPracticeAttempt", {
@@ -738,6 +748,7 @@ export async function submitPracticeAnswer(
       submittedAnswer: input.answerKey,
       isCorrect,
       answeredAt: new Date().toISOString(),
+      ...(input.attemptId ? { attemptId: input.attemptId } : {}),
     });
 
     const refreshedSnapshot = await loadRuntimeAccountSnapshot(accountId);
@@ -761,7 +772,7 @@ export async function submitPracticeAnswer(
 
   const account = await getAccountOrThrow(accountId, store);
   const { questions, categories } = getStore();
-  const question = questions.find((candidate) => candidate.id === input.questionId);
+  const question = input.issuedQuestion ?? questions.find((candidate) => candidate.id === input.questionId);
 
   if (!question) {
     throw new PracticeError("That practice question could not be found.", 404);
@@ -776,6 +787,7 @@ export async function submitPracticeAnswer(
     correctCount: questionStats.correctCount + (isCorrect ? 1 : 0),
     incorrectCount: questionStats.incorrectCount + (isCorrect ? 0 : 1),
     lastAnsweredAt: timestamp,
+    lastAnswerCorrect: isCorrect,
   };
   account.progress.totalAnswered += 1;
   account.progress.totalCorrect += isCorrect ? 1 : 0;
@@ -821,7 +833,7 @@ export async function flagPracticeQuestion(
   },
   store = getPracticeStore(),
 ) {
-  if (env.NODE_ENV !== "test") {
+  if (!env.USE_MEMORY_STORE) {
     const snapshot = await loadRuntimeAccountSnapshot(accountId);
     if (!snapshot) {
       throw new PracticeError("Please sign in again to continue practice.", 401);
@@ -852,7 +864,8 @@ export async function flagPracticeQuestion(
   }
 
   const account = await getAccountOrThrow(accountId, store);
-  const question = getStore().questions.find((candidate) => candidate.id === input.questionId);
+  const question = [...getStore().questions, ...buildQuickQuestions(getStore().categories)]
+    .find((candidate) => candidate.id === input.questionId);
 
   if (!question) {
     throw new PracticeError("That practice question could not be found.", 404);

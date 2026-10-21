@@ -1,7 +1,9 @@
 import { buildSeedData } from "@/lib/questions/seed-data";
 import type { Category, GameRoom, Question } from "@/types/game";
+import type { TimingSample } from "@/lib/game/timing";
 
 interface QuizStoreState {
+  timingSamples?: TimingSample[];
   categories: Category[];
   questions: Question[];
   rooms: Map<string, GameRoom>;

@@ -9,6 +9,7 @@ export async function POST(
     params: Promise<{ roomCode: string }>;
   },
 ) {
+  const receivedAt = Date.now();
   const body = await request.json();
   const parsed = submitAnswerSchema.safeParse(body);
 
@@ -26,7 +27,7 @@ export async function POST(
         answerKey: parsed.data.answerKey,
         confidenceMode: parsed.data.confidenceMode,
         useHint: parsed.data.useHint,
-      }),
+      }, receivedAt),
     );
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Couldn't submit that answer.", 400);

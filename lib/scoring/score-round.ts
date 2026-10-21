@@ -37,8 +37,8 @@ export function getAdaptiveDifficultyOffset(streak: number) {
   return 0;
 }
 
-export function calculateAnswerPoints(answer: ScoreableAnswer) {
-  let points = answer.isCorrect ? getBasePoints(answer.difficulty) : 0;
+export function calculateAnswerPoints(answer: ScoreableAnswer, equalBasePoints = false) {
+  let points = answer.isCorrect ? (equalBasePoints ? 2 : getBasePoints(answer.difficulty)) : 0;
 
   if (answer.isCorrect && answer.hintUsed) {
     points = Math.max(0, points - 1);
@@ -53,7 +53,7 @@ export function calculateAnswerPoints(answer: ScoreableAnswer) {
 
 export function scoreRoundAnswers(
   answers: ScoreableAnswer[],
-  config: Pick<GameConfig, "fastestCorrectBonus" | "teamBonus">,
+  config: Pick<GameConfig, "fastestCorrectBonus" | "teamBonus" | "equalBasePoints">,
 ) {
   const fastestCorrectPlayerId =
     config.fastestCorrectBonus
@@ -65,7 +65,7 @@ export function scoreRoundAnswers(
   const everyoneCorrect = config.teamBonus && answers.length > 0 && answers.every((answer) => answer.isCorrect);
 
   return answers.map<ScoredAnswer>((answer) => {
-    let pointsAwarded = calculateAnswerPoints(answer);
+    let pointsAwarded = calculateAnswerPoints(answer, config.equalBasePoints);
     const fastestCorrect = fastestCorrectPlayerId === answer.playerId;
 
     if (fastestCorrect) {

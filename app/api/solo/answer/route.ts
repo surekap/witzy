@@ -2,6 +2,7 @@ import { soloAnswerSchema } from "@/lib/game/validators";
 import { PracticeError, submitPracticeAnswer } from "@/lib/practice/service";
 import { getPracticeSessionAccountId } from "@/lib/practice/session";
 import { jsonError } from "@/lib/utils/http";
+import { readPracticeTicket } from "@/lib/practice/ticket";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -17,7 +18,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await submitPracticeAnswer(accountId, parsed.data));
+    const issued = readPracticeTicket(parsed.data.ticket, accountId);
+    if (issued.question.id !== parsed.data.questionId) return jsonError("Question does not match the issued ticket.", 400);
+    return Response.json(await submitPracticeAnswer(accountId, { ...parsed.data, issuedQuestion: issued.question, attemptId: issued.attemptId }));
   } catch (error) {
     if (error instanceof PracticeError) {
       return jsonError(error.message, error.status);

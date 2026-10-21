@@ -17,6 +17,8 @@ export async function POST(request: Request) {
       config: {
         numberOfRounds: parsed.data.numberOfRounds,
         answerTimeLimitSeconds: parsed.data.answerTimeLimitSeconds,
+        questionMode: parsed.data.questionMode,
+        equalBasePoints: parsed.data.equalBasePoints,
         categoryMode: parsed.data.categoryMode,
         enabledCategoryIds: parsed.data.enabledCategoryIds,
         fastestCorrectBonus: parsed.data.fastestCorrectBonus,

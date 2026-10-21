@@ -22,7 +22,7 @@ async function loadDatabaseSummaries(questionIds?: string[]) {
 }
 
 export async function getQuestionFlagSummaries(questionIds?: string[]) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     return getQuestionFlagStore().getSummaries(questionIds);
   }
 
@@ -30,7 +30,7 @@ export async function getQuestionFlagSummaries(questionIds?: string[]) {
 }
 
 export async function recordQuestionFlag(input: RecordQuestionFlagInput) {
-  if (env.NODE_ENV === "test") {
+  if (env.USE_MEMORY_STORE) {
     const result = getQuestionFlagStore().upsertFlag(input);
 
     return {

@@ -3,15 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ConvexClient } from "convex/browser";
+import { makeFunctionReference } from "convex/server";
 import {
   startTransition,
   useDeferredValue,
   useEffect,
   useEffectEvent,
+  useRef,
   useState,
 } from "react";
 
 import { primaryButtonClass, secondaryButtonClass, StatPill } from "@/components/ui";
+import { RoomInvite } from "@/components/room-invite";
 import { classNames } from "@/lib/utils/classnames";
 import type { AnswerKey, Category, QuestionDifficulty, RoomStateView } from "@/types/game";
 
@@ -81,36 +85,99 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [now, setNow] = useState(0);
+  const [realtime, setRealtime] = useState(false);
+  const clock = useRef({ serverNow: 0, monotonicAt: 0 });
+  const lastRevision = useRef(-1);
+  const lastServerNow = useRef(0);
+  const polling = useRef(false);
+
+  const applyState = (payload: RoomStateView, requestStarted: number) => {
+    const revision = payload.revision ?? 0;
+    if (revision < lastRevision.current || (revision === lastRevision.current && payload.serverNow < lastServerNow.current)) return;
+    lastRevision.current = revision;
+    lastServerNow.current = payload.serverNow;
+    const received = performance.now();
+    clock.current = { serverNow: payload.serverNow + Math.min(500, (received - requestStarted) / 2), monotonicAt: received };
+    setNow(clock.current.serverNow);
+    setRoomState(payload);
+    setError(null);
+  };
 
   const deferredLeaderboard = useDeferredValue(roomState?.leaderboard ?? []);
 
   const refreshState = useEffectEvent(async () => {
-    const response = await fetch(`/api/rooms/${roomCode}`, { cache: "no-store" });
+    if (polling.current) return;
+    polling.current = true;
+    const started = performance.now();
+    try {
+    const response = await fetch(`/api/rooms/${roomCode}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const payload = await response.json();
     if (!response.ok) {
       setError(payload.error ?? "Couldn't load this room.");
       return;
     }
-    setRoomState(payload);
-    setError(null);
+    applyState(payload, started);
+    } catch {
+      setError("Connection interrupted. Reconnecting; an unconfirmed answer can be retried.");
+    } finally { polling.current = false; }
   });
 
-  useEffect(() => { void refreshState(); }, []);
+  useEffect(() => {
+    const id = window.setTimeout(() => void refreshState(), 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
-    const pollMs = roomState?.currentRound?.status === "active" ? 900 : 1500;
+    const pollMs = realtime ? 5000 : roomState?.currentRound?.status === "active" ? 900 : 1500;
     const id = window.setInterval(() => void refreshState(), pollMs);
     return () => window.clearInterval(id);
-  }, [roomState?.currentRound?.status]);
+  }, [roomState?.currentRound?.status, realtime]);
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 250);
+    const token = roomState?.subscriptionToken;
+    const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+    // Test mode uses in-memory rooms and must never contact a live deployment.
+    if (!token || !url || process.env.NEXT_PUBLIC_WITZY_TEST_MODE === "1") return;
+    const client = new ConvexClient(url, { logger: false });
+    const stop = client.onUpdate(makeFunctionReference<"query", { roomCode: string; token: string }, number>("rooms:watchRevision"), { roomCode, token }, (revision) => {
+      setRealtime(true);
+      if (revision > lastRevision.current) void refreshState();
+    }, () => setRealtime(false));
+    const connectionCheck = window.setInterval(() => {
+      if (!client.connectionState().isWebSocketConnected) setRealtime(false);
+    }, 3000);
+    return () => { window.clearInterval(connectionCheck); stop(); void client.close(); };
+  }, [roomCode, roomState?.subscriptionToken]);
+
+  useEffect(() => {
+    if (roomState?.currentRound?.status !== "active" || !roomState.currentRound.endsAt || !clock.current.serverNow) return;
+    const currentServerTime = clock.current.serverNow + performance.now() - clock.current.monotonicAt;
+    const remaining = Date.parse(roomState.currentRound.endsAt) + 1600 - currentServerTime;
+    const id = window.setTimeout(() => void refreshState(), Math.max(0, remaining));
+    return () => window.clearTimeout(id);
+  }, [roomState?.currentRound?.endsAt, roomState?.currentRound?.status]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (clock.current.serverNow) setNow(clock.current.serverNow + performance.now() - clock.current.monotonicAt);
+    }, 100);
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (roomState?.viewer.role !== "player") return;
+    const beat = () => { void fetch(`/api/rooms/${roomCode}/heartbeat`, { method: "POST" }).catch(() => undefined); };
+    beat();
+    const id = window.setInterval(beat, 5000);
+    return () => window.clearInterval(id);
+  }, [roomCode, roomState?.viewer.role]);
+
   const runAction = async (url: string, body?: unknown) => {
+    const started = performance.now();
+    try {
     const response = await fetch(url, {
       method: "POST",
+      signal: AbortSignal.timeout(10_000),
       headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -119,8 +186,10 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
       setError(payload.error ?? "That action didn't work.");
       return;
     }
-    setRoomState(payload);
-    setError(null);
+    applyState(payload, started);
+    } catch {
+      setError("We couldn't confirm that action. Check your connection and retry.");
+    }
   };
 
   /* ── Error / loading ── */
@@ -197,7 +266,7 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
             />
             <StatPill
               label="Timer"
-              value={`${roomState.room.config.answerTimeLimitSeconds}s`}
+              value={typeof roomState.room.config.answerTimeLimitSeconds === "number" ? `${roomState.room.config.answerTimeLimitSeconds}s` : roomState.room.config.answerTimeLimitSeconds}
               accent="amber"
             />
             <StatPill
@@ -219,6 +288,7 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
         </p>
 
         {error ? <p className="alert-error">{error}</p> : null}
+        {isHost && roomState.room.status === "lobby" ? <RoomInvite joinUrl={roomState.room.joinUrl} roomCode={roomCode} /> : null}
       </header>
 
       {/* ── Main two-column layout ── */}
@@ -338,11 +408,13 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                         : "Round reveal"}
                   </h2>
                 </div>
-                <TimerPill endsAt={currentRound.endsAt} now={now} />
+                {currentRound.status === "active" ? <TimerPill endsAt={currentRound.endsAt} now={now} /> : <span className="timer-pill ok">Complete</span>}
               </div>
 
               {/* Player question */}
-              {currentRound.status === "active" && playerQuestion && roomState.viewer.role === "player" ? (
+              {currentRound.status === "active" && currentRound.startedAt && now < Date.parse(currentRound.startedAt) ? (
+                <p role="status" className="section-title">Get ready... {Math.ceil((Date.parse(currentRound.startedAt) - now) / 1000)}</p>
+              ) : currentRound.status === "active" && playerQuestion && roomState.viewer.role === "player" ? (
                 <PlayerQuestionPanel
                   key={playerQuestion.assignedQuestionId}
                   playerQuestion={playerQuestion}
@@ -350,6 +422,9 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                   runAction={runAction}
                   wageringEnabled={roomState.room.config.confidenceWager}
                   hintsEnabled={roomState.room.config.hints}
+                  timeExpired={Boolean(currentRound.endsAt && now >= Date.parse(currentRound.endsAt))}
+                  equalBasePoints={roomState.room.config.equalBasePoints ?? false}
+                  compactAnswers={roomState.room.config.questionMode === "quick"}
                 />
               ) : null}
 
@@ -522,7 +597,7 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                       {[
                         {
                           label: "Difficulty",
-                          value: `${formatDifficulty(result.assignedDifficulty)} (${basePointsByDifficulty[result.assignedDifficulty]} pts)`,
+                          value: `${formatDifficulty(result.assignedDifficulty)} (${roomState.room.config.equalBasePoints ? 2 : basePointsByDifficulty[result.assignedDifficulty]} pts)`,
                           color: "var(--ink)",
                         },
                         {
@@ -708,12 +783,18 @@ function PlayerQuestionPanel({
   runAction,
   wageringEnabled,
   hintsEnabled,
+  timeExpired,
+  equalBasePoints,
+  compactAnswers,
 }: {
   playerQuestion: NonNullable<RoomStateView["playerQuestion"]>;
   roomCode: string;
   runAction: (url: string, body?: unknown) => Promise<void>;
   wageringEnabled: boolean;
   hintsEnabled: boolean;
+  timeExpired: boolean;
+  equalBasePoints: boolean;
+  compactAnswers: boolean;
 }) {
   const [selectedAnswer, setSelectedAnswer] = useState<AnswerKey | null>(
     playerQuestion.submittedAnswer ?? null,
@@ -721,7 +802,9 @@ function PlayerQuestionPanel({
   const [confidenceMode, setConfidenceMode] = useState<"safe" | "bold">(
     (playerQuestion.confidenceMode as "safe" | "bold" | null) ?? "safe",
   );
-  const [hintRequested, setHintRequested] = useState(playerQuestion.hintUsed);
+  const hintRequested = playerQuestion.hintUsed;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUsingHint, setIsUsingHint] = useState(false);
   const [isFlaggingQuestion, setIsFlaggingQuestion] = useState(false);
   const [hasFlaggedQuestion, setHasFlaggedQuestion] = useState(false);
   const [flagMessage, setFlagMessage] = useState<string | null>(null);
@@ -763,7 +846,7 @@ function PlayerQuestionPanel({
           </strong>
           {" · "}Worth{" "}
           <strong style={{ color: "var(--ink)" }}>
-            {basePointsByDifficulty[playerQuestion.assignedDifficulty]} pts
+            {equalBasePoints ? 2 : basePointsByDifficulty[playerQuestion.assignedDifficulty]} pts
           </strong>
         </p>
         <h3
@@ -781,17 +864,17 @@ function PlayerQuestionPanel({
       </div>
 
       {/* Answer tiles */}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className={compactAnswers ? "grid grid-cols-2 gap-3" : "grid gap-3 sm:grid-cols-2"}>
         {options.map(([key, value]) => (
           <button
             key={key}
             className={classNames("answer-tile", selectedAnswer === key ? "selected" : "")}
-            disabled={playerQuestion.locked}
+            disabled={playerQuestion.locked || timeExpired || isSubmitting}
             onClick={() => setSelectedAnswer(key)}
             type="button"
           >
             <span className="answer-tile-key">{key.toUpperCase()}</span>
-            <span>{value}</span>
+            <span className="min-w-0 break-words">{value}</span>
           </button>
         ))}
       </div>
@@ -801,7 +884,7 @@ function PlayerQuestionPanel({
         {wageringEnabled ? (
           <button
             className={confidenceMode === "bold" ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
-            disabled={playerQuestion.locked}
+            disabled={playerQuestion.locked || timeExpired || isSubmitting}
             onClick={() => setConfidenceMode(confidenceMode === "safe" ? "bold" : "safe")}
             type="button"
           >
@@ -812,8 +895,13 @@ function PlayerQuestionPanel({
         {hintsEnabled ? (
           <button
             className="btn btn-secondary btn-sm"
-            disabled={playerQuestion.locked || hintRequested || playerQuestion.hintsRemaining <= 0}
-            onClick={() => setHintRequested(true)}
+            disabled={playerQuestion.locked || timeExpired || hintRequested || isUsingHint || playerQuestion.hintsRemaining <= 0}
+            onClick={async () => {
+              setIsUsingHint(true);
+              setSelectedAnswer(null);
+              try { await runAction(`/api/rooms/${roomCode}/hints`, { assignedQuestionId: playerQuestion.assignedQuestionId }); }
+              finally { setIsUsingHint(false); }
+            }}
             type="button"
           >
             {hintRequested
@@ -828,20 +916,23 @@ function PlayerQuestionPanel({
       {/* Submit */}
       <button
         className={primaryButtonClass}
-        disabled={!selectedAnswer || playerQuestion.locked}
+        disabled={!selectedAnswer || playerQuestion.locked || timeExpired || isSubmitting || isUsingHint}
         onClick={() =>
           startTransition(async () => {
+            setIsSubmitting(true);
+            try {
             await runAction(`/api/rooms/${roomCode}/answers`, {
               assignedQuestionId: playerQuestion.assignedQuestionId,
               answerKey: selectedAnswer,
               confidenceMode,
               useHint: hintRequested,
             });
+            } finally { setIsSubmitting(false); }
           })
         }
         type="button"
       >
-        {playerQuestion.locked ? "Answer locked ✓" : "Lock in answer"}
+        {playerQuestion.locked ? "Answer locked ✓" : isSubmitting ? "Sending answer..." : timeExpired ? "Time's up - confirming answers" : "Lock in answer"}
       </button>
 
       <button

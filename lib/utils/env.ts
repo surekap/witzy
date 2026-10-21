@@ -26,6 +26,8 @@ if (!parsedEnvironment.success) {
 
 export const env = {
   ...parsedEnvironment.data,
+  USE_MEMORY_STORE: parsedEnvironment.data.NODE_ENV === "test" ||
+    (parsedEnvironment.data.NODE_ENV === "development" && process.env.WITZY_TEST_MODE === "1"),
   SESSION_SECRET:
     parsedEnvironment.data.SESSION_SECRET ??
     (parsedEnvironment.data.NODE_ENV === "production"

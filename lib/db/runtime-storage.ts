@@ -1,4 +1,5 @@
 import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
+import { buildQuickQuestions } from "@/lib/questions/quick-bank";
 import type { GameRoom, Category, Question } from "@/types/game";
 
 export interface PersistedRoomState {
@@ -17,10 +18,32 @@ interface QuestionBankQuestionsPage {
   continueCursor: string;
 }
 
+export async function loadCategoriesFromDatabase() {
+  return runConvexQuery<Record<string, never>, Category[]>("questionBank:listQuestionBankCategories", {});
+}
+
+export async function loadQuickQuestionsFromDatabase(categories: Category[]) {
+  const disabledIds = await runConvexQuery<Record<string, never>, string[]>("questionBank:listDisabledQuickQuestions", {});
+  const disabled = new Set(disabledIds);
+  return buildQuickQuestions(categories).filter((question) => !disabled.has(question.id));
+}
+
+let bankCache: { version: string | null; promise: Promise<{ categories: Category[]; questions: Question[] }> } | undefined;
+
 export async function loadQuestionBankFromDatabase() {
-  const categories = await runConvexQuery<Record<string, never>, Category[]>(
+  const version = await runConvexQuery<Record<string, never>, string | null>("questionBank:getActiveQuestionBankVersion", {});
+  if (!bankCache || bankCache.version !== version) {
+    const promise = loadVersion(version);
+    bankCache = { version, promise };
+    promise.catch(() => { if (bankCache?.promise === promise) bankCache = undefined; });
+  }
+  return structuredClone(await bankCache.promise);
+}
+
+async function loadVersion(version: string | null) {
+  const categories = await runConvexQuery<{ version: string | null }, Category[]>(
     "questionBank:listQuestionBankCategories",
-    {},
+    { version },
   );
 
   const questions: Question[] = [];
@@ -29,6 +52,7 @@ export async function loadQuestionBankFromDatabase() {
   while (true) {
     const result: QuestionBankQuestionsPage = await runConvexQuery<
       {
+        version: string | null;
         paginationOpts: {
           numItems: number;
           cursor: string | null;
@@ -36,6 +60,7 @@ export async function loadQuestionBankFromDatabase() {
       },
       QuestionBankQuestionsPage
     >("questionBank:listQuestionBankQuestionsPage", {
+      version,
       paginationOpts: {
         numItems: 500,
         cursor,

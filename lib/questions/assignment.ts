@@ -46,7 +46,12 @@ function buildDifficultyRelaxation(targetDifficulty: QuestionDifficulty) {
 }
 
 function sortQuestions(questions: Question[]) {
-  return [...questions].sort((left, right) => left.id.localeCompare(right.id));
+  const shuffled = [...questions];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 export function assignQuestionForPlayer(params: {

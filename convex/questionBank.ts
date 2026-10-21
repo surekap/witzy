@@ -1,4 +1,4 @@
-import { mutationGeneric, paginationOptsValidator, queryGeneric } from "convex/server";
+import { internalMutationGeneric as mutationGeneric, paginationOptsValidator, internalQueryGeneric as queryGeneric } from "convex/server";
 import { v } from "convex/values";
 
 const categoryValidator = v.object({
@@ -34,6 +34,27 @@ const questionValidator = v.object({
   tags: v.array(v.string()),
   createdAt: v.string(),
   updatedAt: v.string(),
+});
+
+export const listDisabledQuickQuestions = queryGeneric({
+  args: {},
+  handler: async (ctx) => {
+    const setting = await ctx.db.query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "disabledQuickQuestions")).unique();
+    return JSON.parse(setting?.stringValue ?? "[]") as string[];
+  },
+});
+
+export const disableQuickQuestions = mutationGeneric({
+  args: { questionIds: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const setting = await ctx.db.query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "disabledQuickQuestions")).unique();
+    const existing = JSON.parse(setting?.stringValue ?? "[]") as string[];
+    const stringValue = JSON.stringify([...new Set([...existing, ...args.questionIds])]);
+    if (setting) await ctx.db.patch(setting._id, { stringValue });
+    else await ctx.db.insert("settings", { key: "disabledQuickQuestions", stringValue });
+  },
 });
 
 async function getCurrentQuestionBankVersion(ctx: any): Promise<string | null> {
@@ -84,9 +105,9 @@ function mapQuestionRow(question: any) {
 }
 
 export const listQuestionBankCategories = queryGeneric({
-  args: {},
-  handler: async (ctx) => {
-    const currentVersion = await getCurrentQuestionBankVersion(ctx);
+  args: { version: v.optional(v.union(v.string(), v.null())) },
+  handler: async (ctx, args) => {
+    const currentVersion = args.version === undefined ? await getCurrentQuestionBankVersion(ctx) : args.version;
 
     if (!currentVersion) {
       return [] as ReturnType<typeof mapCategoryRow>[];
@@ -106,10 +127,11 @@ export const listQuestionBankCategories = queryGeneric({
 
 export const listQuestionBankQuestionsPage = queryGeneric({
   args: {
+    version: v.optional(v.union(v.string(), v.null())),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const currentVersion = await getCurrentQuestionBankVersion(ctx);
+    const currentVersion = args.version === undefined ? await getCurrentQuestionBankVersion(ctx) : args.version;
 
     if (!currentVersion) {
       return {
@@ -198,11 +220,15 @@ export const seedQuestionsBatch = mutationGeneric({
 
 export const activateQuestionBankVersion = mutationGeneric({
   args: {
+    expectedVersion: v.optional(v.union(v.string(), v.null())),
     version: v.string(),
     activatedAt: v.string(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("settings").withIndex("by_key", (query) => query.eq("key", "currentQuestionBankVersion")).unique();
+    if (args.expectedVersion !== undefined && (existing?.stringValue ?? null) !== args.expectedVersion) {
+      throw new Error("The question bank changed during this import. Retry against the latest version.");
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -243,6 +269,7 @@ export const deleteQuestionBankVersionChunk = mutationGeneric({
     categoryChunkSize: v.number(),
   },
   handler: async (ctx, args) => {
+    if (await getCurrentQuestionBankVersion(ctx) === args.version) throw new Error("Cannot delete the active question bank.");
     const [questionRows, categoryRows] = await Promise.all([
       ctx.db
         .query("questions")

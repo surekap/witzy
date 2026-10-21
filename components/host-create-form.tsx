@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 
 import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
-import type { Category } from "@/types/game";
+import type { Category, GameConfig } from "@/types/game";
 
 const rounds = [5, 10, 15] as const;
-const timeLimits = [10, 15, 20] as const;
+const timeLimits = [30, 45, 60, 90] as const;
 
 type HostCreateState = {
   hostName: string;
   numberOfRounds: 5 | 10 | 15;
-  answerTimeLimitSeconds: 10 | 15 | 20;
+  answerTimeLimitSeconds: GameConfig["answerTimeLimitSeconds"];
+  questionMode: "quick" | "extended";
+  equalBasePoints: boolean;
   categoryMode: "host_selects_each_round" | "random_from_selected_pool";
   enabledCategoryIds: string[];
   fastestCorrectBonus: boolean;
@@ -37,11 +39,13 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
   const [formState, setFormState] = useState<HostCreateState>({
     hostName: "Quizmaster",
     numberOfRounds: 5,
-    answerTimeLimitSeconds: 15,
+    answerTimeLimitSeconds: "auto",
+    questionMode: "quick",
+    equalBasePoints: true,
     categoryMode: "host_selects_each_round",
     enabledCategoryIds: categories.map((c) => c.id),
-    fastestCorrectBonus: true,
-    confidenceWager: true,
+    fastestCorrectBonus: false,
+    confidenceWager: false,
     teamBonus: true,
     hints: true,
   });
@@ -58,14 +62,13 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
   const submit = async () => {
     setError(null);
     setIsSubmitting(true);
-
+    try {
     const response = await fetch("/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formState),
     });
     const payload = await response.json();
-    setIsSubmitting(false);
 
     if (!response.ok) {
       setError(payload.error ?? "Couldn't create the room.");
@@ -73,6 +76,8 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
     }
 
     router.push(`/game/${payload.roomCode}`);
+    } catch { setError("Couldn't connect. Please try again."); }
+    finally { setIsSubmitting(false); }
   };
 
   return (
@@ -138,10 +143,13 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
                 onChange={(e) =>
                   setFormState((s) => ({
                     ...s,
-                    answerTimeLimitSeconds: Number(e.target.value) as 10 | 15 | 20,
+                    answerTimeLimitSeconds: e.target.value === "auto" || e.target.value === "relaxed"
+                      ? e.target.value : Number(e.target.value) as 30 | 45 | 60 | 90,
                   }))
                 }
               >
+                <option value="auto">Auto - read, think, answer</option>
+                <option value="relaxed">Relaxed - 50% more time</option>
                 {timeLimits.map((t) => (
                   <option key={t} value={t}>{t} seconds</option>
                 ))}
@@ -198,6 +206,17 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
         </div>
 
         {/* ── Optional mechanics ── */}
+        <div className="space-y-3">
+          <p className="field-hint">Auto gives everyone the longest allowance needed in the room. Rounds finish early when everyone answers. Fixed timers override this allowance.</p>
+          <label className="block">
+            <span className="field-label">Question style</span>
+            <select className="form-input" value={formState.questionMode} onChange={(event) => setFormState((state) => ({ ...state, questionMode: event.target.value as "quick" | "extended" }))}>
+              <option value="quick">Quick play - concise, age-reviewed questions</option>
+              <option value="extended">Extended - legacy bank, age labels unverified</option>
+            </select>
+          </label>
+          <p className="field-hint">Quick play uses a smaller starter collection; questions may repeat in longer games. All ages earn 2 base points per correct answer. Speed bonuses are disabled in mixed-age rooms.</p>
+        </div>
         <div>
           <p className="field-label mb-3">Optional mechanics</p>
           <div className="grid gap-2.5 sm:grid-cols-2">

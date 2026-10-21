@@ -11,7 +11,8 @@ import type { PracticeAccountProfile, PracticeLifetimeProgress } from "@/types/p
 
 interface SoloQuestionPayload {
   category: Category;
-  question: Question;
+  question: Omit<Question, "correctAnswer" | "explanation">;
+  ticket: string;
   lifetimeProgress: PracticeLifetimeProgress;
 }
 
@@ -171,6 +172,7 @@ export function SoloPractice({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionId: current.question.id,
+          ticket: current.ticket,
           answerKey: selectedAnswer,
         }),
       });

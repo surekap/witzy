@@ -94,44 +94,19 @@ AGE_MAX_EASY = {
     "15_plus":  "15_plus",
 }
 
+# Age is a prerequisite/readability boundary, not a proxy for giftedness.
 AGE_NOTES = {
-    "6_to_8":
-        "IB PYP Years 1–3. TOP-DECILE 6–8 year olds: strong readers, handle 2–3 step "
-        "reasoning, familiar with IB central ideas and lines of inquiry. Questions must be "
-        "concept-led — not trivially obvious. All 4 distractors MUST be plausible — "
-        "absolutely no joke or physically impossible options.",
-    "9_to_11":
-        "IB PYP Years 4–5 / MYP Year 1. TOP-DECILE 9–11 year olds: apply concepts to "
-        "unfamiliar contexts, understand multi-step cause-and-effect chains, beginning to "
-        "evaluate. Use PYP key concepts: form, function, causation, change, connection, "
-        "perspective, responsibility, reflection.",
-    "12_to_14":
-        "IB MYP Years 2–4. TOP-DECILE 12–14 year olds: strong analytical thinkers, "
-        "fluent with MYP global contexts and ATL skills. Questions MUST require evaluation "
-        "or application to unfamiliar scenarios. Use MYP command terms: analyse, compare, "
-        "evaluate, justify, discuss, examine.",
-    "15_plus":
-        "IB MYP Year 5 / DP Year 1. TOP-DECILE 15+ year olds: near DP level. Questions "
-        "can draw on DP content — Maths (calculus, vectors, proof), Theory of Knowledge, "
-        "DP Sciences, DP History. Use DP command terms: evaluate, synthesise, to what "
-        "extent, critically assess. Distractors must represent genuine misconceptions that "
-        "a confident but misinformed student would choose.",
+    "6_to_8": "Typical 6-8 year olds. Familiar everyday objects, concrete ideas, one reasoning step. No specialist terminology or assumed IB knowledge. Prompt <=19 words; each option <=5 words; total <=35 words.",
+    "9_to_11": "Typical 9-11 year olds. Familiar primary-school concepts; at most two short reasoning steps. Prompt <=25 words; each option <=7 words; total <=45 words.",
+    "12_to_14": "Typical 12-14 year olds. Lower-secondary prerequisites; concise application rather than long scenarios. Prompt <=30 words; each option <=9 words; total <=55 words.",
+    "15_plus": "Typical 15+ students. Secondary-school prerequisites, not assumed specialist DP courses. Prompt <=35 words; each option <=11 words; total <=65 words.",
 }
+WORD_LIMITS = {"6_to_8": (19, 5, 35), "9_to_11": (25, 7, 45), "12_to_14": (30, 9, 55), "15_plus": (35, 11, 65)}
 
 DIFF_NOTES = {
-    "easy":
-        "EASY for top-decile IB students: direct recall or single-step application of a "
-        "concept they have definitely studied. Still challenging — NOT trivially obvious. "
-        "All 4 options must be plausible. Rotate correctAnswer evenly across A, B, C, D.",
-    "medium":
-        "MEDIUM: requires applying knowledge to a new context OR connecting two distinct "
-        "concepts OR spotting a nuanced distinction. At least 2 distractors must represent "
-        "genuine student misconceptions. Should require genuine thought.",
-    "hard":
-        "HARD: requires multi-step reasoning, evaluation of competing claims, or precise "
-        "recall of a non-obvious detail. ALL distractors must be plausible for a "
-        "well-studied student who hasn't fully grasped the nuance. Never let the answer "
-        "be obvious from the question wording.",
+    "easy": "Direct recall or one familiar application, within the stated age prerequisites.",
+    "medium": "Apply a familiar concept. For ages 6-8, keep this to one concrete reasoning step.",
+    "hard": "A less familiar application within the same age prerequisites. No extra jargon, trick wording, or longer text. For ages 6-8, still only one concrete reasoning step.",
 }
 
 SILLY_WORDS = [
@@ -178,7 +153,7 @@ def build_prompt(cat, age, diff, count, used_prompts):
         f'{{\n'
         f'  "categorySlug": "{cat["slug"]}",\n'
         f'  "title": "<3–6 word topic label>",\n'
-        f'  "prompt": "<question text, 1–3 sentences, varied phrasing>",\n'
+        f'  "prompt": "<one concise question; only essential context>",\n'
         f'  "modality": "text",\n'
         f'  "difficulty": "{diff}",\n'
         f'  "ageBandMin": "{age}",\n'
@@ -188,7 +163,7 @@ def build_prompt(cat, age, diff, count, used_prompts):
         f'  "correctAnswer": "<A|B|C|D>",\n'
         f'  "explanation": "<2–3 sentences: (a) why correct is right with a specific fact, (b) why top distractor is wrong>",\n'
         f'  "estimatedSeconds": <integer 20–90>,\n'
-        f'  "active": true,\n'
+        f'  "active": false,\n'
         f'  "tags": ["{cat["slug"]}", "<subtopic1>", "<subtopic2>"]\n'
         f'}}\n\n'
         f"HARD CONSTRAINTS:\n"
@@ -197,7 +172,8 @@ def build_prompt(cat, age, diff, count, used_prompts):
         f"3. No two questions may share identical option texts.\n"
         f"4. estimatedSeconds = max(20, floor(total_word_count × 0.9)), cap 90.\n"
         f"5. Explanation: (a) WHY correct is right with a specific fact, (b) WHY top distractor is wrong.\n"
-        f"6. Questions must genuinely challenge a TOP-DECILE IB student.\n"
+        f"6. Difficulty changes reasoning demand, never the age prerequisites or reading level. Drafts require age and factual review before publication.\n"
+        f"9. Answer options must be similarly concise, grammatically parallel, and have exactly one defensible correct answer. Do not use all/none of the above.\n"
         f'7. Vary formats: "Why does...", "A student claims X. Evaluate.", '
         f'"What would happen if...", "Compare X and Y...", "Identify the error in:", etc.\n'
         f"8. Cover DIFFERENT sub-topics within the category across the {count} questions."
@@ -227,6 +203,16 @@ def validate_batch(raw, cat, age, diff):
             amin = AGE_ORD.get(q.get("ageBandMin"), -1)
             amax = AGE_ORD.get(q.get("ageBandMax"), -1)
             assert 0 <= amin <= amax
+            assert q.get("ageBandMin") == age
+            prompt_limit, option_limit, total_limit = WORD_LIMITS[age]
+            prompt_words = len(q.get("prompt", "").split())
+            option_words = [len(str(value).split()) for value in opts.values()]
+            assert prompt_words <= prompt_limit
+            assert max(option_words) <= option_limit
+            assert prompt_words + sum(option_words) <= total_limit
+            assert len({str(value).strip().lower() for value in opts.values()}) == 4
+            q["active"] = False
+            q["reviewedForAge"] = False
             valid.append(q)
         except AssertionError:
             pass
@@ -292,7 +278,8 @@ def load_salvageable():
         "ageBandMin": q["ageBandMin"], "ageBandMax": q.get("ageBandMax", q["ageBandMin"]),
         "answerType": q.get("answerType", "multiple_choice"), "options": q["options"],
         "correctAnswer": q["correctAnswer"], "explanation": q.get("explanation", ""),
-        "estimatedSeconds": q.get("estimatedSeconds", 25), "active": True, "tags": q.get("tags", []),
+        "estimatedSeconds": q.get("estimatedSeconds", 25), "active": False,
+        "reviewedForAge": False, "tags": q.get("tags", []),
     } for q in good]
 
 # ── CHECKPOINT ────────────────────────────────────────────────────────────────

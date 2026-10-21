@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { questionQualityIssues } from "@/lib/questions/quality";
 
 import { z } from "zod";
 
@@ -10,6 +11,11 @@ const answerKeys: AnswerKey[] = ["A", "B", "C", "D"];
 const modalityValues: QuestionModality[] = ["text", "image", "audio"];
 const answerTypeValues: AnswerType[] = ["multiple_choice", "single_tap_image", "true_false"];
 const defaultCategoryIcon = "📚";
+
+function stableId(value: string) {
+  const hash = createHash("sha256").update(value).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
 
 const categorySchema = z.object({
   id: z.string().uuid().optional(),
@@ -60,9 +66,15 @@ const questionSchema = z
     mediaAltText: z.string().trim().min(1).nullable().optional(),
     estimatedSeconds: z.number().int().min(5).max(120).default(15),
     active: z.boolean().default(true),
+    reviewedForAge: z.boolean().default(false),
     tags: z.array(z.string().trim().min(1)).default([]),
   })
   .superRefine((question, context) => {
+    if (question.reviewedForAge) {
+      for (const issue of questionQualityIssues(question)) context.addIssue({ code: "custom", message: `Quick-play review failed: ${issue}`, path: ["prompt"] });
+    }
+    const options = Object.values(question.options).map((value) => value?.trim().toLowerCase());
+    if (new Set(options).size !== options.length) context.addIssue({ code: "custom", message: "Options must be distinct.", path: ["options"] });
     if (!question.options[question.correctAnswer]) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -165,7 +177,7 @@ function normalizeLegacyQuestionBank(input: unknown): unknown {
     const ageBand =
       typeof source.ageBand === "string" && ageBands.includes(source.ageBand as (typeof ageBands)[number])
         ? (source.ageBand as (typeof ageBands)[number])
-        : "9_to_11";
+        : undefined;
     const answerType =
       typeof source.answerType === "string" &&
       answerTypeValues.includes(source.answerType as AnswerType)
@@ -194,12 +206,12 @@ function normalizeLegacyQuestionBank(input: unknown): unknown {
     const correctAnswer =
       typeof source.correctAnswer === "string" && answerKeys.includes(source.correctAnswer as AnswerKey)
         ? (source.correctAnswer as AnswerKey)
-        : (Object.keys(options)[0] as AnswerKey | undefined) ?? "A";
+        : undefined;
 
     return {
       categorySlug,
       title: typeof source.title === "string" && source.title.trim().length > 0 ? source.title : "Untitled",
-      prompt: typeof source.prompt === "string" && source.prompt.trim().length > 0 ? source.prompt : "No prompt provided.",
+      prompt: typeof source.prompt === "string" && source.prompt.trim().length > 0 ? source.prompt : undefined,
       modality:
         typeof source.modality === "string" && modalityValues.includes(source.modality as QuestionModality)
           ? source.modality
@@ -218,6 +230,7 @@ function normalizeLegacyQuestionBank(input: unknown): unknown {
       mediaAltText: typeof source.mediaAltText === "string" ? source.mediaAltText : undefined,
       estimatedSeconds: typeof source.estimatedSeconds === "number" ? source.estimatedSeconds : 20,
       active: typeof source.active === "boolean" ? source.active : true,
+      reviewedForAge: source.reviewedForAge === true,
       tags:
         Array.isArray(source.tags) && source.tags.every((tag) => typeof tag === "string")
           ? source.tags
@@ -251,7 +264,7 @@ export function normalizeImportedQuestionBank(input: unknown) {
 
     seenSlugs.add(category.slug);
     return {
-      id: category.id ?? randomUUID(),
+      id: category.id ?? stableId(`category:${category.slug}`),
       slug: category.slug,
       name: category.name ?? category.title ?? toTitleCaseFromSlug(category.slug),
       icon: category.icon ?? defaultCategoryIcon,
@@ -261,6 +274,7 @@ export function normalizeImportedQuestionBank(input: unknown) {
 
   const categoryIdBySlug = new Map(categories.map((category) => [category.slug, category.id]));
 
+  const seenQuestionIds = new Set<string>();
   const questions: Question[] = parsed.questions.map((question, index) => {
     const categoryId = categoryIdBySlug.get(question.categorySlug);
 
@@ -270,8 +284,11 @@ export function normalizeImportedQuestionBank(input: unknown) {
       );
     }
 
+    const id = question.id ?? stableId(JSON.stringify([question.categorySlug, question.prompt, question.options, question.correctAnswer]));
+    if (seenQuestionIds.has(id)) throw new Error(`Duplicate question id: ${id}`);
+    seenQuestionIds.add(id);
     return {
-      id: question.id ?? randomUUID(),
+      id,
       categoryId,
       title: question.title,
       prompt: question.prompt,
@@ -287,7 +304,7 @@ export function normalizeImportedQuestionBank(input: unknown) {
       mediaAltText: question.mediaAltText ?? null,
       estimatedSeconds: question.estimatedSeconds,
       active: question.active,
-      tags: question.tags,
+      tags: [...question.tags.filter((tag) => tag !== "age-reviewed:v1"), ...(question.reviewedForAge ? ["age-reviewed:v1"] : [])],
       createdAt: now,
       updatedAt: now,
     };

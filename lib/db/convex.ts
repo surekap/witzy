@@ -1,13 +1,11 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference, type DefaultFunctionArgs } from "convex/server";
 
-import { env, requireConvexUrl } from "@/lib/utils/env";
+import { requireConvexAdminKey, requireConvexUrl } from "@/lib/utils/env";
 
 function createConvexAdminClient() {
   const client = new ConvexHttpClient(requireConvexUrl(), { logger: false });
-  if (env.CONVEX_ADMIN_KEY) {
-    (client as unknown as { setAdminAuth: (token: string) => void }).setAdminAuth(env.CONVEX_ADMIN_KEY);
-  }
+  (client as unknown as { setAdminAuth: (token: string) => void }).setAdminAuth(requireConvexAdminKey());
   return client;
 }
 

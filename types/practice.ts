@@ -1,4 +1,5 @@
 export interface PracticeQuestionStat {
+  lastAnswerCorrect?: boolean;
   correctCount: number;
   incorrectCount: number;
   lastAnsweredAt: string | null;
