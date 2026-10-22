@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 const environmentSchema = z.object({
-  // Trimmed: values pasted into the Vercel dashboard can carry a trailing newline, which breaks the auth header.
+  // Pasted values can carry a trailing newline or arrive URL-encoded ("|" as "%7C"); either breaks the auth header.
+  // Deploy keys never contain "%", so decoding is safe.
   NEXT_PUBLIC_CONVEX_URL: z.string().trim().url().optional(),
-  CONVEX_ADMIN_KEY: z.string().trim().min(1).optional(),
+  CONVEX_ADMIN_KEY: z.string().trim().min(1).transform((key) => decodeURIComponent(key)).optional(),
   SESSION_SECRET: z.string().min(16).optional(),
   ADMIN_PANEL_PASSWORD: z.string().min(8).optional(),
   MEDIA_BASE_URL: z.string().url().optional(),
