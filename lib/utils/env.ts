@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 const environmentSchema = z.object({
-  NEXT_PUBLIC_CONVEX_URL: z.string().url().optional(),
-  CONVEX_ADMIN_KEY: z.string().min(1).optional(),
+  // Trimmed: values pasted into the Vercel dashboard can carry a trailing newline, which breaks the auth header.
+  NEXT_PUBLIC_CONVEX_URL: z.string().trim().url().optional(),
+  CONVEX_ADMIN_KEY: z.string().trim().min(1).optional(),
   SESSION_SECRET: z.string().min(16).optional(),
   ADMIN_PANEL_PASSWORD: z.string().min(8).optional(),
   MEDIA_BASE_URL: z.string().url().optional(),
