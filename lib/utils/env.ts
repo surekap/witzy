@@ -49,8 +49,11 @@ export function requireConvexAdminKey() {
   // Deploy keys look like "prod:<deployment>|<secret>". Describe a mismatch without revealing any of the secret.
   const key = env.CONVEX_ADMIN_KEY;
   if (!/^(prod|dev|preview):[\w:-]+\|\S+$/.test(key)) {
+    const prefix = `prod:${new URL(requireConvexUrl()).hostname.split(".")[0]}`;
+    const nonAscii = [...key].flatMap((char, index) => (char.codePointAt(0)! > 126 ? [`${index}:U+${char.codePointAt(0)!.toString(16)}`] : []));
     console.error(`CONVEX_ADMIN_KEY is not a Convex deploy key: length ${key.length}, "|" count ${key.split("|").length - 1}, ` +
-      `whitespace ${/\s/.test(key)}, quoted ${/^["']/.test(key)}, type prefix ${/^(prod|dev|preview):/.exec(key)?.[1] ?? "none"}`);
+      `whitespace ${/\s/.test(key)}, quoted ${/^["']/.test(key)}, starts with ${prefix} ${key.startsWith(prefix)}, ` +
+      `next char U+${key.codePointAt(prefix.length)?.toString(16)}, non-ASCII [${nonAscii.join(" ")}]`);
   }
 
   return key;
