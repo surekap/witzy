@@ -1,5 +1,4 @@
 import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
-import { buildQuickQuestions } from "@/lib/questions/quick-bank";
 import type { GameRoom, Category, Question } from "@/types/game";
 
 export interface PersistedRoomState {
@@ -22,12 +21,7 @@ export async function loadCategoriesFromDatabase() {
   return runConvexQuery<Record<string, never>, Category[]>("questionBank:listQuestionBankCategories", {});
 }
 
-export async function loadQuickQuestionsFromDatabase(categories: Category[]) {
-  const disabledIds = await runConvexQuery<Record<string, never>, string[]>("questionBank:listDisabledQuickQuestions", {});
-  const disabled = new Set(disabledIds);
-  return buildQuickQuestions(categories).filter((question) => !disabled.has(question.id));
-}
-
+// The cached bank is shared by every caller, so treat what it returns as read-only.
 let bankCache: { version: string | null; promise: Promise<{ categories: Category[]; questions: Question[] }> } | undefined;
 
 export async function loadQuestionBankFromDatabase() {
@@ -37,7 +31,7 @@ export async function loadQuestionBankFromDatabase() {
     bankCache = { version, promise };
     promise.catch(() => { if (bankCache?.promise === promise) bankCache = undefined; });
   }
-  return structuredClone(await bankCache.promise);
+  return bankCache.promise;
 }
 
 async function loadVersion(version: string | null) {

@@ -1,9 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
-import { buildQuickQuestions } from "@/lib/questions/quick-bank";
-import { isQuickQuestion } from "@/lib/questions/quality";
-import { loadQuestionBankFromDatabase, loadQuickQuestionsFromDatabase } from "@/lib/db/runtime-storage";
+import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
 import { isQuestionAgeCompatible, resolvePlayerDifficulty } from "@/lib/questions/assignment";
 import { recordQuestionFlag } from "@/lib/question-flags/service";
 import { getStore } from "@/lib/game/store";
@@ -422,12 +420,11 @@ async function loadRuntimeAccountSnapshot(accountId: string) {
     loadRuntimeAttempts(accountId),
   ]);
 
-  const playableQuestions = [...questions, ...await loadQuickQuestionsFromDatabase(categories)];
   return {
     account,
     categories,
-    questions: playableQuestions,
-    progress: buildProgressFromAttempts(attempts, playableQuestions, categories),
+    questions,
+    progress: buildProgressFromAttempts(attempts, questions, categories),
   };
 }
 
@@ -607,7 +604,6 @@ export async function getSoloPracticeQuestion(
     ageBand: AgeBand;
     difficultyMode?: DifficultyMode;
     askedQuestionIds: string[];
-    questionMode?: "quick" | "extended";
   },
   store = getPracticeStore(),
 ) {
@@ -619,7 +615,7 @@ export async function getSoloPracticeQuestion(
 
     const category = findCategoryOrThrow(input.categoryId, snapshot.categories);
     const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
-      questions: input.questionMode === "quick" ? snapshot.questions.filter(isQuickQuestion) : snapshot.questions,
+      questions: snapshot.questions,
       categoryId: category.id,
       ageBand: input.ageBand,
     });
@@ -640,7 +636,7 @@ export async function getSoloPracticeQuestion(
 
     const question = selectPracticeQuestionForAccount({
       category,
-      questions: input.questionMode === "quick" ? snapshot.questions.filter(isQuickQuestion) : snapshot.questions,
+      questions: snapshot.questions,
       ageBand: input.ageBand,
       targetDifficulty,
       askedQuestionIds: input.askedQuestionIds,
@@ -664,7 +660,7 @@ export async function getSoloPracticeQuestion(
   const account = await getAccountOrThrow(accountId, store);
   const { questions, categories } = getStore();
   const category = findCategoryOrThrow(input.categoryId, categories);
-  const practiceQuestions = input.questionMode === "quick" ? [...questions, ...buildQuickQuestions(categories)].filter(isQuickQuestion) : questions;
+  const practiceQuestions = questions;
   const hasSeededQuestions = hasSeededQuestionsForCategoryAgeBand({
     questions: practiceQuestions,
     categoryId: category.id,
@@ -864,8 +860,7 @@ export async function flagPracticeQuestion(
   }
 
   const account = await getAccountOrThrow(accountId, store);
-  const question = [...getStore().questions, ...buildQuickQuestions(getStore().categories)]
-    .find((candidate) => candidate.id === input.questionId);
+  const question = getStore().questions.find((candidate) => candidate.id === input.questionId);
 
   if (!question) {
     throw new PracticeError("That practice question could not be found.", 404);

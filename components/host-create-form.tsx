@@ -15,7 +15,6 @@ type HostCreateState = {
   hostName: string;
   numberOfRounds: 5 | 10 | 15;
   answerTimeLimitSeconds: GameConfig["answerTimeLimitSeconds"];
-  questionMode: "quick" | "extended";
   equalBasePoints: boolean;
   categoryMode: "host_selects_each_round" | "random_from_selected_pool";
   enabledCategoryIds: string[];
@@ -40,7 +39,6 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
     hostName: "Quizmaster",
     numberOfRounds: 5,
     answerTimeLimitSeconds: "auto",
-    questionMode: "quick",
     equalBasePoints: true,
     categoryMode: "host_selects_each_round",
     enabledCategoryIds: categories.map((c) => c.id),
@@ -208,14 +206,7 @@ export function HostCreateForm({ categories }: { categories: Category[] }) {
         {/* ── Optional mechanics ── */}
         <div className="space-y-3">
           <p className="field-hint">Auto gives everyone the longest allowance needed in the room. Rounds finish early when everyone answers. Fixed timers override this allowance.</p>
-          <label className="block">
-            <span className="field-label">Question style</span>
-            <select className="form-input" value={formState.questionMode} onChange={(event) => setFormState((state) => ({ ...state, questionMode: event.target.value as "quick" | "extended" }))}>
-              <option value="quick">Quick play - concise, age-reviewed questions</option>
-              <option value="extended">Extended - legacy bank, age labels unverified</option>
-            </select>
-          </label>
-          <p className="field-hint">Quick play uses a smaller starter collection; questions may repeat in longer games. All ages earn 2 base points per correct answer. Speed bonuses are disabled in mixed-age rooms.</p>
+          <p className="field-hint">Questions come from one age-appropriate collection. All ages earn 2 base points per correct answer. Speed bonuses are disabled in mixed-age rooms.</p>
         </div>
         <div>
           <p className="field-label mb-3">Optional mechanics</p>

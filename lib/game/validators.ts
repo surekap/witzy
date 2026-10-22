@@ -4,7 +4,6 @@ export const createRoomSchema = z.object({
   hostName: z.string().trim().min(2).max(30),
   numberOfRounds: z.union([z.literal(5), z.literal(10), z.literal(15)]),
   answerTimeLimitSeconds: z.union([z.literal("auto"), z.literal("relaxed"), z.literal(30), z.literal(45), z.literal(60), z.literal(90)]).default("auto"),
-  questionMode: z.enum(["quick", "extended"]).default("quick"),
   equalBasePoints: z.boolean().default(true),
   categoryMode: z.union([z.literal("host_selects_each_round"), z.literal("random_from_selected_pool")]),
   enabledCategoryIds: z.array(z.string()).min(1),
@@ -43,7 +42,6 @@ export const submitAnswerSchema = z.object({
 });
 
 export const soloQuestionSchema = z.object({
-  questionMode: z.enum(["quick", "extended"]).default("quick"),
   categoryId: z.string().trim().min(1),
   ageBand: z.union([
     z.literal("6_to_8"),

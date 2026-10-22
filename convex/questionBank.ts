@@ -36,27 +36,6 @@ const questionValidator = v.object({
   updatedAt: v.string(),
 });
 
-export const listDisabledQuickQuestions = queryGeneric({
-  args: {},
-  handler: async (ctx) => {
-    const setting = await ctx.db.query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "disabledQuickQuestions")).unique();
-    return JSON.parse(setting?.stringValue ?? "[]") as string[];
-  },
-});
-
-export const disableQuickQuestions = mutationGeneric({
-  args: { questionIds: v.array(v.string()) },
-  handler: async (ctx, args) => {
-    const setting = await ctx.db.query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "disabledQuickQuestions")).unique();
-    const existing = JSON.parse(setting?.stringValue ?? "[]") as string[];
-    const stringValue = JSON.stringify([...new Set([...existing, ...args.questionIds])]);
-    if (setting) await ctx.db.patch(setting._id, { stringValue });
-    else await ctx.db.insert("settings", { key: "disabledQuickQuestions", stringValue });
-  },
-});
-
 async function getCurrentQuestionBankVersion(ctx: any): Promise<string | null> {
   const setting = await ctx.db
     .query("settings")

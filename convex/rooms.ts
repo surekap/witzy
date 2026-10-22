@@ -1,8 +1,8 @@
 import { internalMutationGeneric as mutationGeneric, internalQueryGeneric as queryGeneric, queryGeneric as publicQuery } from "convex/server";
 import { v } from "convex/values";
 import { recordRoomAnswer } from "../lib/game/answer";
+import { roundTimingSamples } from "../lib/game/timing";
 import type { GameRoom } from "../types/game";
-import { isQuickQuestion, questionWordCount } from "../lib/questions/quality";
 
 // A separate, read-only bearer capability reveals only a revision number. Never
 // expose the host/player action credential to the browser subscription client.
@@ -95,15 +95,7 @@ export const updateRoomState = mutationGeneric({
     const updated = args.room as GameRoom;
     const round = updated.rounds.at(-1);
     if (round?.status === "locked" && previous.rounds.at(-1)?.status === "active") {
-      for (const assignment of round.assignments) {
-        const player = updated.players.find((entry) => entry.id === assignment.gamePlayerId);
-        const timedOut = assignment.answer?.submittedAnswer === null && Date.parse(round.lockedAt!) >= Date.parse(round.endsAt!);
-        if (!player || assignment.hintUsed || !isQuickQuestion(assignment.questionSnapshot) || assignment.questionSnapshot.modality !== "text" || (!assignment.answer?.isCorrect && !timedOut)) continue;
-        const seconds = timedOut ? (Date.parse(round.endsAt!) - Date.parse(round.startedAt!)) / 1000 : assignment.answer!.responseMs! / 1000;
-        if (!Number.isFinite(seconds) || seconds < 0) continue;
-        await ctx.db.insert("timingObservations", { ageBand: player.ageBand, difficulty: assignment.assignedDifficulty,
-          words: questionWordCount(assignment.questionSnapshot), seconds, timedOut, createdAt: Date.now() });
-      }
+      for (const sample of roundTimingSamples(updated, round)) await ctx.db.insert("timingObservations", { ...sample, createdAt: Date.now() });
     }
     await ctx.db.patch(existing._id, {
       room: args.room,
@@ -124,18 +116,36 @@ export const listTimingObservations = queryGeneric({
   },
 });
 
+// Presence is deliberately outside the room's compare-and-swap: it patches one player in place and
+// leaves `version` alone, so heartbeats neither wake every subscriber nor make host actions retry.
+export const touchPresence = mutationGeneric({
+  args: { roomCode: v.string(), sessionKey: v.string() },
+  handler: async (ctx, args) => {
+    const stored = await ctx.db.query("rooms").withIndex("by_room_code", (q) => q.eq("roomCode", args.roomCode)).unique();
+    const room = stored?.room as GameRoom | undefined;
+    const player = room?.players.find((entry) => entry.sessionKey === args.sessionKey);
+    if (!stored || !room || !player) throw new Error("Join this room first.");
+    player.lastSeenAt = new Date().toISOString();
+    player.isConnected = true;
+    await ctx.db.patch(stored._id, { room });
+    return { ok: true };
+  },
+});
+
 export const submitAnswer = mutationGeneric({
   args: {
     roomCode: v.string(), sessionKey: v.string(), assignedQuestionId: v.string(),
     answerKey: v.union(v.literal("A"), v.literal("B"), v.literal("C"), v.literal("D")),
     confidenceMode: v.optional(v.union(v.literal("safe"), v.literal("bold"))), useHint: v.optional(v.boolean()),
+    // When the web server received the request; absent from builds that predate it.
+    receivedAt: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
-    const receivedAt = Date.now();
+  handler: async (ctx, { receivedAt, ...args }) => {
+    const now = Date.now();
     const stored = await ctx.db.query("rooms").withIndex("by_room_code", (q) => q.eq("roomCode", args.roomCode)).unique();
     if (!stored) throw new Error("Room not found.");
     const room = stored.room as GameRoom;
-    recordRoomAnswer(room, args.sessionKey, args, receivedAt);
+    recordRoomAnswer(room, args.sessionKey, args, receivedAt ?? now, now);
     await ctx.db.patch(stored._id, { room, version: stored.version + 1, updatedAt: room.updatedAt });
     return { accepted: true };
   },

@@ -47,7 +47,6 @@ export interface Question {
 export interface GameConfig {
   numberOfRounds: 5 | 10 | 15;
   answerTimeLimitSeconds: "auto" | "relaxed" | 10 | 15 | 20 | 30 | 45 | 60 | 90;
-  questionMode?: "quick" | "extended";
   equalBasePoints?: boolean;
   categoryMode: CategoryMode;
   enabledCategoryIds: string[];
@@ -161,7 +160,6 @@ export interface PlayerQuestionView {
   assignedQuestionId: string;
   questionId: string;
   assignedDifficulty: QuestionDifficulty;
-  title: string;
   prompt: string;
   modality: QuestionModality;
   answerType: AnswerType;
@@ -209,7 +207,6 @@ export interface RoomStateView {
     status: GameRoomStatus;
     currentRoundNumber: number;
     config: GameConfig;
-    joinUrl: string;
     createdAt: string;
   };
   viewer: RoomViewer;

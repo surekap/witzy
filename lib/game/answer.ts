@@ -1,11 +1,13 @@
 import type { AnswerKey, ConfidenceMode, GameRoom } from "@/types/game";
-import { SUBMISSION_GRACE_MS } from "@/lib/game/timing";
+import { MAX_RELAY_MS, SUBMISSION_GRACE_MS } from "@/lib/game/timing";
 
 export interface AnswerSubmission { assignedQuestionId: string; answerKey: AnswerKey; confidenceMode?: ConfidenceMode; useHint?: boolean }
 
 // Runs in one Convex mutation in production, so simultaneous players never
 // overwrite each other's answers and retries cannot double-consume a hint.
-export function recordRoomAnswer(room: GameRoom, sessionKey: string | null, input: AnswerSubmission, receivedAt: number) {
+// `receivedAt` is when our own server got the request, so the hop to Convex and its
+// cold starts are not charged to the child; `now` (the executing clock) only bounds how stale a relay may be.
+export function recordRoomAnswer(room: GameRoom, sessionKey: string | null, input: AnswerSubmission, receivedAt: number, now = receivedAt) {
   const player = room.players.find((entry) => entry.sessionKey === sessionKey);
   if (!player) throw new Error("Join this room before answering.");
   const round = room.rounds.find((entry) => entry.assignments.some((assignment) => assignment.id === input.assignedQuestionId));
@@ -15,7 +17,8 @@ export function recordRoomAnswer(room: GameRoom, sessionKey: string | null, inpu
     if (assignment.answer.submittedAnswer === input.answerKey) return;
     throw new Error("You already locked in an answer for this question.");
   }
-  if (round.status !== "active" || !round.endsAt || receivedAt > Date.parse(round.endsAt) + SUBMISSION_GRACE_MS) throw new Error("That round is no longer accepting answers.");
+  const deadline = round.endsAt ? Date.parse(round.endsAt) + SUBMISSION_GRACE_MS : 0;
+  if (round.status !== "active" || !deadline || receivedAt > deadline || now > deadline + MAX_RELAY_MS) throw new Error("That round is no longer accepting answers.");
   if (round.startedAt && receivedAt < Date.parse(round.startedAt)) throw new Error("The round is about to start.");
   if (!assignment.questionSnapshot.options[input.answerKey]) throw new Error("Choose one of the displayed answers.");
   if (input.useHint && room.config.hints && !assignment.hintUsed) {

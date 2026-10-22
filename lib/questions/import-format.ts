@@ -71,7 +71,7 @@ const questionSchema = z
   })
   .superRefine((question, context) => {
     if (question.reviewedForAge) {
-      for (const issue of questionQualityIssues(question)) context.addIssue({ code: "custom", message: `Quick-play review failed: ${issue}`, path: ["prompt"] });
+      for (const issue of questionQualityIssues(question)) context.addIssue({ code: "custom", message: `Question review failed: ${issue}`, path: ["prompt"] });
     }
     const options = Object.values(question.options).map((value) => value?.trim().toLowerCase());
     if (new Set(options).size !== options.length) context.addIssue({ code: "custom", message: "Options must be distinct.", path: ["options"] });

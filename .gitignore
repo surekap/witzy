@@ -13,5 +13,7 @@ tsconfig.tsbuildinfo
 .env*.local
 anthropic/key
 .data
+# Database exports contain children's names and password hashes; never commit them.
+/data/runtime-snapshot/
 .playwright-mcp/**
 /data/external/question-datasets/raw/**

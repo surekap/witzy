@@ -7,7 +7,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "WITZY_TEST_MODE=1 NEXT_PUBLIC_WITZY_TEST_MODE=1 NEXT_PUBLIC_APP_URL=http://localhost:3001 corepack pnpm exec next dev --port 3001",
+    command: "WITZY_TEST_MODE=1 NEXT_PUBLIC_WITZY_TEST_MODE=1 corepack pnpm exec next dev --port 3001",
     url: "http://localhost:3001",
     reuseExistingServer: false,
     timeout: 120_000,

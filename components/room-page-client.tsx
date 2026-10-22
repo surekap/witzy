@@ -12,18 +12,44 @@ import {
   useEffectEvent,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 
 import { primaryButtonClass, secondaryButtonClass, StatPill } from "@/components/ui";
 import { RoomInvite } from "@/components/room-invite";
 import { classNames } from "@/lib/utils/classnames";
-import type { AnswerKey, Category, QuestionDifficulty, RoomStateView } from "@/types/game";
+import type { AnswerKey, Category, CurrentRoundView, QuestionDifficulty, RoomStateView } from "@/types/game";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
-function getSecondsLeft(endsAt: string | null, now: number): number | null {
-  if (!endsAt) return null;
-  return Math.max(0, Math.ceil((new Date(endsAt).getTime() - now) / 1000));
+// Server time at `monotonicAt` (performance.now), from the response with the smallest round trip.
+type Clock = { serverNow: number; monotonicAt: number; rtt: number };
+const HEARTBEAT_MS = 15_000; // keep well under PRESENCE_TIMEOUT_MS (lib/game/timing.ts)
+const serverTime = (clock: Clock) => clock.serverNow + performance.now() - clock.monotonicAt;
+
+// Ticks 10x a second for the one small component that shows it, so the room page itself never re-renders for the clock.
+function useServerNow(clock: RefObject<Clock>) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(serverTime(clock.current));
+    const first = window.setTimeout(tick, 0);
+    const id = window.setInterval(tick, 100);
+    return () => { window.clearTimeout(first); window.clearInterval(id); };
+  }, [clock]);
+  return now;
+}
+
+// True once server time passes `iso`; re-renders the caller only when that flips.
+function useReached(clock: RefObject<Clock>, iso: string | null | undefined) {
+  const [reached, setReached] = useState<string | null>(null);
+  useEffect(() => {
+    if (!iso) return;
+    const check = () => { if (serverTime(clock.current) >= Date.parse(iso)) { setReached(iso); window.clearInterval(id); } };
+    const first = window.setTimeout(check, 0);
+    const id = window.setInterval(check, 100);
+    return () => { window.clearTimeout(first); window.clearInterval(id); };
+  }, [clock, iso]);
+  return Boolean(iso) && reached === iso;
 }
 
 function getAvatarClass(color: string) {
@@ -49,15 +75,11 @@ function formatDifficulty(difficulty: QuestionDifficulty) {
   return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 }
 
-function TimerPill({ endsAt, now }: { endsAt: string | null; now: number }) {
-  const secs = getSecondsLeft(endsAt, now);
-  if (secs === null) {
-    return (
-      <div className="timer-pill ok" style={{ fontSize: "0.875rem" }}>
-        Waiting
-      </div>
-    );
-  }
+function RoundTimer({ clock, round }: { clock: RefObject<Clock>; round: CurrentRoundView }) {
+  const now = useServerNow(clock);
+  if (now === null || !round.endsAt || !round.startedAt) return <div className="timer-pill ok" style={{ fontSize: "0.875rem" }}>Waiting</div>;
+  if (now < Date.parse(round.startedAt)) return <div className="timer-pill ok" style={{ fontSize: "0.875rem" }}>Get ready</div>;
+  const secs = Math.max(0, Math.ceil((Date.parse(round.endsAt) - now) / 1000));
   const urgency = secs <= 4 ? "urgent" : secs <= 9 ? "warn" : "ok";
   return (
     <div className={`timer-pill ${urgency}`}>
@@ -84,12 +106,15 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
   const [roomState, setRoomState] = useState<RoomStateView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
-  const [now, setNow] = useState(0);
   const [realtime, setRealtime] = useState(false);
-  const clock = useRef({ serverNow: 0, monotonicAt: 0 });
+  const clock = useRef<Clock>({ serverNow: 0, monotonicAt: 0, rtt: Infinity });
   const lastRevision = useRef(-1);
   const lastServerNow = useRef(0);
-  const polling = useRef(false);
+  const refreshing = useRef(false);
+  const refreshQueued = useRef(false);
+  const roundStatus = roomState?.currentRound?.status;
+  const hasStarted = useReached(clock, roomState?.currentRound?.startedAt);
+  const hasExpired = useReached(clock, roomState?.currentRound?.endsAt);
 
   const applyState = (payload: RoomStateView, requestStarted: number) => {
     const revision = payload.revision ?? 0;
@@ -97,29 +122,44 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
     lastRevision.current = revision;
     lastServerNow.current = payload.serverNow;
     const received = performance.now();
-    clock.current = { serverNow: payload.serverNow + Math.min(500, (received - requestStarted) / 2), monotonicAt: received };
-    setNow(clock.current.serverNow);
+    const rtt = received - requestStarted;
+    // The lowest-latency response gives the truest offset; adopt a slower one only to stop a stale offset drifting.
+    if (rtt < clock.current.rtt || received - clock.current.monotonicAt > 60_000) {
+      clock.current = { serverNow: payload.serverNow + rtt / 2, monotonicAt: received, rtt };
+    }
     setRoomState(payload);
     setError(null);
   };
 
   const deferredLeaderboard = useDeferredValue(roomState?.leaderboard ?? []);
 
-  const refreshState = useEffectEvent(async () => {
-    if (polling.current) return;
-    polling.current = true;
-    const started = performance.now();
+  const fetchState = async () => {
+    const requestStarted = performance.now();
     try {
-    const response = await fetch(`/api/rooms/${roomCode}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error ?? "Couldn't load this room.");
-      return;
-    }
-    applyState(payload, started);
+      const response = await fetch(`/api/rooms/${roomCode}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error ?? "Couldn't load this room.");
+        return;
+      }
+      applyState(payload, requestStarted);
     } catch {
       setError("Connection interrupted. Reconnecting; an unconfirmed answer can be retried.");
-    } finally { polling.current = false; }
+    }
+  };
+
+  // One fetch at a time; a request that arrives meanwhile queues exactly one follow-up so the newest change is never dropped.
+  const refreshState = useEffectEvent(async () => {
+    if (refreshing.current) {
+      refreshQueued.current = true;
+      return;
+    }
+    refreshing.current = true;
+    do {
+      refreshQueued.current = false;
+      await fetchState();
+    } while (refreshQueued.current);
+    refreshing.current = false;
   });
 
   useEffect(() => {
@@ -127,11 +167,25 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
     return () => window.clearTimeout(id);
   }, []);
 
+  // Phones sleep tabs and drop networks; catch up the moment the player is back.
   useEffect(() => {
-    const pollMs = realtime ? 5000 : roomState?.currentRound?.status === "active" ? 900 : 1500;
+    const wake = () => { if (document.visibilityState === "visible") void refreshState(); };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("pageshow", wake);
+    return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("pageshow", wake);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Past the deadline nothing bumps the revision, so poll until the server has locked the round.
+    const pollMs = roundStatus === "active" && hasExpired ? 1000 : realtime ? 5000 : roundStatus === "active" ? 900 : 1500;
     const id = window.setInterval(() => void refreshState(), pollMs);
     return () => window.clearInterval(id);
-  }, [roomState?.currentRound?.status, realtime]);
+  }, [roundStatus, hasExpired, realtime]);
 
   useEffect(() => {
     const token = roomState?.subscriptionToken;
@@ -150,25 +204,10 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
   }, [roomCode, roomState?.subscriptionToken]);
 
   useEffect(() => {
-    if (roomState?.currentRound?.status !== "active" || !roomState.currentRound.endsAt || !clock.current.serverNow) return;
-    const currentServerTime = clock.current.serverNow + performance.now() - clock.current.monotonicAt;
-    const remaining = Date.parse(roomState.currentRound.endsAt) + 1600 - currentServerTime;
-    const id = window.setTimeout(() => void refreshState(), Math.max(0, remaining));
-    return () => window.clearTimeout(id);
-  }, [roomState?.currentRound?.endsAt, roomState?.currentRound?.status]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (clock.current.serverNow) setNow(clock.current.serverNow + performance.now() - clock.current.monotonicAt);
-    }, 100);
-    return () => window.clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     if (roomState?.viewer.role !== "player") return;
     const beat = () => { void fetch(`/api/rooms/${roomCode}/heartbeat`, { method: "POST" }).catch(() => undefined); };
     beat();
-    const id = window.setInterval(beat, 5000);
+    const id = window.setInterval(beat, HEARTBEAT_MS);
     return () => window.clearInterval(id);
   }, [roomCode, roomState?.viewer.role]);
 
@@ -283,12 +322,10 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
 
         <p style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
           Host: <strong style={{ color: "var(--ink)" }}>{roomState.room.hostName}</strong>
-          {" · "}Join at{" "}
-          <span style={{ fontWeight: 600, color: "var(--coral)" }}>{roomState.room.joinUrl}</span>
         </p>
 
         {error ? <p className="alert-error">{error}</p> : null}
-        {isHost && roomState.room.status === "lobby" ? <RoomInvite joinUrl={roomState.room.joinUrl} roomCode={roomCode} /> : null}
+        {isHost && roomState.room.status === "lobby" ? <RoomInvite roomCode={roomCode} /> : null}
       </header>
 
       {/* ── Main two-column layout ── */}
@@ -408,12 +445,12 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                         : "Round reveal"}
                   </h2>
                 </div>
-                {currentRound.status === "active" ? <TimerPill endsAt={currentRound.endsAt} now={now} /> : <span className="timer-pill ok">Complete</span>}
+                {currentRound.status === "active" ? <RoundTimer clock={clock} round={currentRound} /> : <span className="timer-pill ok">Complete</span>}
               </div>
 
               {/* Player question */}
-              {currentRound.status === "active" && currentRound.startedAt && now < Date.parse(currentRound.startedAt) ? (
-                <p role="status" className="section-title">Get ready... {Math.ceil((Date.parse(currentRound.startedAt) - now) / 1000)}</p>
+              {currentRound.status === "active" && !hasStarted ? (
+                <p role="status" className="section-title">Get ready...</p>
               ) : currentRound.status === "active" && playerQuestion && roomState.viewer.role === "player" ? (
                 <PlayerQuestionPanel
                   key={playerQuestion.assignedQuestionId}
@@ -422,10 +459,15 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
                   runAction={runAction}
                   wageringEnabled={roomState.room.config.confidenceWager}
                   hintsEnabled={roomState.room.config.hints}
-                  timeExpired={Boolean(currentRound.endsAt && now >= Date.parse(currentRound.endsAt))}
+                  timeExpired={hasExpired}
                   equalBasePoints={roomState.room.config.equalBasePoints ?? false}
-                  compactAnswers={roomState.room.config.questionMode === "quick"}
+                  compactAnswers={Object.values(playerQuestion.options).every((option) => (option?.length ?? 0) <= 28)}
                 />
+              ) : null}
+
+              {/* Joined mid-round: no question yet */}
+              {hasStarted && currentRound.status === "active" && roomState.viewer.role === "player" && !playerQuestion ? (
+                <p className="spectator-notice">You joined during this round. You&apos;ll get your own question in the next one.</p>
               ) : null}
 
               {/* Host live stats */}
@@ -684,6 +726,13 @@ export function RoomPageClient({ roomCode }: { roomCode: string }) {
 
         {/* ── Right: leaderboard + players ── */}
         <div className="space-y-5">
+          {/* Late joiners can still scan in during play */}
+          {isHost && roomState.room.status === "in_progress" ? (
+            <div className="surface">
+              <RoomInvite roomCode={roomCode} compact />
+            </div>
+          ) : null}
+
           {/* Leaderboard */}
           <div className="surface space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -809,10 +858,33 @@ function PlayerQuestionPanel({
   const [hasFlaggedQuestion, setHasFlaggedQuestion] = useState(false);
   const [flagMessage, setFlagMessage] = useState<string | null>(null);
 
+  // Dropping two wrong options only leaves a fair 50/50 when there are four to start with.
+  const canHint = hintsEnabled && Object.keys(playerQuestion.options).length === 4;
   const hiddenKeys = hintRequested ? playerQuestion.hintRemoves : [];
   const options = (Object.entries(playerQuestion.options) as Array<[AnswerKey, string]>).filter(
     ([k]) => !hiddenKeys.includes(k),
   );
+
+  const submit = () =>
+    startTransition(async () => {
+      setIsSubmitting(true);
+      try {
+        await runAction(`/api/rooms/${roomCode}/answers`, {
+          assignedQuestionId: playerQuestion.assignedQuestionId,
+          answerKey: selectedAnswer,
+          confidenceMode,
+          useHint: hintRequested,
+        });
+      } finally { setIsSubmitting(false); }
+    });
+
+  // A chosen answer that was not locked in is sent when the clock reaches zero; the server's grace window covers the trip.
+  const submitAtDeadline = useEffectEvent(() => {
+    if (selectedAnswer && !playerQuestion.locked && !isSubmitting) submit();
+  });
+  useEffect(() => {
+    if (timeExpired) submitAtDeadline();
+  }, [timeExpired]);
 
   return (
     <div className="space-y-5">
@@ -836,10 +908,7 @@ function PlayerQuestionPanel({
 
       {/* Question text */}
       <div>
-        <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ink-muted)" }}>
-          {playerQuestion.title}
-        </p>
-        <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)", marginTop: "0.25rem" }}>
+        <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
           Difficulty:{" "}
           <strong style={{ color: "var(--ink)" }}>
             {formatDifficulty(playerQuestion.assignedDifficulty)}
@@ -892,7 +961,7 @@ function PlayerQuestionPanel({
           </button>
         ) : null}
 
-        {hintsEnabled ? (
+        {canHint ? (
           <button
             className="btn btn-secondary btn-sm"
             disabled={playerQuestion.locked || timeExpired || hintRequested || isUsingHint || playerQuestion.hintsRemaining <= 0}
@@ -917,19 +986,7 @@ function PlayerQuestionPanel({
       <button
         className={primaryButtonClass}
         disabled={!selectedAnswer || playerQuestion.locked || timeExpired || isSubmitting || isUsingHint}
-        onClick={() =>
-          startTransition(async () => {
-            setIsSubmitting(true);
-            try {
-            await runAction(`/api/rooms/${roomCode}/answers`, {
-              assignedQuestionId: playerQuestion.assignedQuestionId,
-              answerKey: selectedAnswer,
-              confidenceMode,
-              useHint: hintRequested,
-            });
-            } finally { setIsSubmitting(false); }
-          })
-        }
+        onClick={submit}
         type="button"
       >
         {playerQuestion.locked ? "Answer locked ✓" : isSubmitting ? "Sending answer..." : timeExpired ? "Time's up - confirming answers" : "Lock in answer"}

@@ -3,249 +3,186 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import type { z } from "zod";
 import { joinRoomSchema } from "@/lib/game/validators";
 
 import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
+import { classNames } from "@/lib/utils/classnames";
 
 const avatarColors = ["amber", "coral", "lime", "violet", "sky", "cyan", "rose"] as const;
-type AvatarColor = (typeof avatarColors)[number];
+const ageBands = [
+  { value: "6_to_8", label: "6–8" },
+  { value: "9_to_11", label: "9–11" },
+  { value: "12_to_14", label: "12–14" },
+  { value: "15_plus", label: "15+" },
+] as const;
+const profileKey = "witzy-join-profile-v1";
 
-type JoinRoomState = {
-  roomCode: string;
-  displayName: string;
-  ageBand: "6_to_8" | "9_to_11" | "12_to_14" | "15_plus";
-  difficultyMode: "easy" | "medium" | "hard" | "adaptive";
-  avatarColor: AvatarColor;
-};
+type Profile = z.infer<typeof joinRoomSchema>;
+const ageLabel = (profile: Profile) => ageBands.find((band) => band.value === profile.ageBand)?.label;
 
 export function JoinRoomForm({ initialRoomCode }: { initialRoomCode: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rememberProfile, setRememberProfile] = useState(false);
-  const [formState, setFormState] = useState<JoinRoomState>({
-    roomCode: initialRoomCode,
-    displayName: "Player",
-    ageBand: "9_to_11",
-    difficultyMode: "adaptive",
-    avatarColor: "cyan",
-  });
+  const [remember, setRemember] = useState(true);
+  const [roomCode, setRoomCode] = useState(initialRoomCode);
+  // undefined until localStorage has been read, so the form never flashes before the one-tap button.
+  const [saved, setSaved] = useState<Profile | null | undefined>(undefined);
+  const [someoneElse, setSomeoneElse] = useState(false);
+  const [name, setName] = useState("");
+  const [ageBand, setAgeBand] = useState<Profile["ageBand"] | null>(null);
+  const [difficultyMode, setDifficultyMode] = useState<Profile["difficultyMode"]>("adaptive");
+  const [avatarColor, setAvatarColor] = useState<(typeof avatarColors)[number]>("cyan");
 
   useEffect(() => {
     const id = window.setTimeout(() => {
       try {
-        const saved = JSON.parse(localStorage.getItem("witzy-join-profile-v1") ?? "null");
-        const profile = joinRoomSchema.safeParse(saved);
-        if (profile.success && avatarColors.includes(profile.data.avatarColor as AvatarColor)) {
-          setFormState((state) => ({ ...state, ...profile.data, avatarColor: profile.data.avatarColor as AvatarColor }));
-          setRememberProfile(true);
+        const profile = joinRoomSchema.safeParse(JSON.parse(localStorage.getItem(profileKey) ?? "null"));
+        setSaved(profile.success ? profile.data : null);
+        // Typing a room code by hand is not the one-tap path, so offer the saved details as a filled-in form.
+        if (profile.success && !initialRoomCode) {
+          setName(profile.data.displayName);
+          setAgeBand(profile.data.ageBand);
         }
-      } catch { /* Storage may be unavailable on shared/private devices. */ }
+      } catch { setSaved(null); /* Storage may be unavailable on shared/private devices. */ }
     }, 0);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [initialRoomCode]);
 
-  const submit = async () => {
+  const join = async (profile: Profile) => {
     setIsSubmitting(true);
     setError(null);
     try {
-    const response = await fetch(`/api/rooms/${formState.roomCode.toUpperCase()}/join`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: formState.displayName,
-        ageBand: formState.ageBand,
-        difficultyMode: formState.difficultyMode,
-        avatarColor: formState.avatarColor,
-      }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setError(payload.error ?? "Couldn't join that room.");
-      return;
-    }
-
-    try {
-      if (rememberProfile) localStorage.setItem("witzy-join-profile-v1", JSON.stringify({ displayName: formState.displayName, ageBand: formState.ageBand, difficultyMode: formState.difficultyMode, avatarColor: formState.avatarColor }));
-      else localStorage.removeItem("witzy-join-profile-v1");
-    } catch { /* Joining does not depend on browser storage. */ }
-    router.push(`/game/${payload.roomCode}`);
+      const response = await fetch(`/api/rooms/${roomCode.toUpperCase()}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error ?? "Couldn't join that room.");
+        return;
+      }
+      try {
+        if (remember) localStorage.setItem(profileKey, JSON.stringify(profile));
+        else localStorage.removeItem(profileKey);
+      } catch { /* Joining does not depend on browser storage. */ }
+      router.push(`/game/${payload.roomCode}`);
     } catch { setError("Couldn't connect. Please try again."); }
     finally { setIsSubmitting(false); }
   };
 
   return (
-    <div className="space-y-8">
-      {/* ── Page header ── */}
+    <div className="space-y-5">
       <header className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <Image src="/media/logo.png" alt="Witzy" width={32} height={32} className="rounded-lg" unoptimized />
         </Link>
         <div>
-          <p className="section-eyebrow">Join a room</p>
-          <h1
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 800,
-              fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
-              color: "var(--ink)",
-            }}
-          >
+          <p className="section-eyebrow">{initialRoomCode ? `Room ${roomCode}` : "Join a room"}</p>
+          <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "clamp(1.5rem, 4vw, 2.25rem)", lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)" }}>
             Hop into the quiz
           </h1>
         </div>
       </header>
 
-      <div className="surface space-y-7">
-        {/* ── Room code + name ── */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="field-label">Room code</span>
-            <input
-              className="form-input"
-              style={{ textTransform: "uppercase", letterSpacing: "0.12em", fontSize: "1.25rem", fontWeight: 700 }}
-              value={formState.roomCode}
-              onChange={(e) =>
-                setFormState((s) => ({ ...s, roomCode: e.target.value.toUpperCase() }))
-              }
-              placeholder="ABCD"
-              maxLength={8}
-            />
-          </label>
+      {saved === undefined ? null : saved && initialRoomCode && !someoneElse ? (
+        <div className="surface space-y-4">
+          <button className={classNames(primaryButtonClass, "btn-lg w-full")} disabled={isSubmitting} onClick={() => void join(saved)} type="button">
+            {isSubmitting ? "Joining…" : `Join as ${saved.displayName} · ${ageLabel(saved)}`}
+          </button>
+          <button className="underline" onClick={() => setSomeoneElse(true)} type="button">Someone else?</button>
+          {error ? <p className="alert-error">{error}</p> : null}
+        </div>
+      ) : (
+        <form
+          className="surface space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (ageBand) void join({ displayName: name.trim(), ageBand, difficultyMode, avatarColor });
+          }}
+        >
+          {initialRoomCode ? null : (
+            <label className="block">
+              <span className="field-label">Room code</span>
+              <input
+                autoFocus
+                className="form-input"
+                style={{ textTransform: "uppercase", letterSpacing: "0.12em", fontSize: "1.25rem", fontWeight: 700 }}
+                maxLength={8}
+                onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
+                placeholder="ABCD"
+                required
+                value={roomCode}
+              />
+            </label>
+          )}
           <label className="block">
             <span className="field-label">Your name</span>
             <input
+              autoComplete="given-name"
+              autoFocus={Boolean(initialRoomCode)}
               className="form-input"
-              value={formState.displayName}
-              onChange={(e) => setFormState((s) => ({ ...s, displayName: e.target.value }))}
-              placeholder="Player"
+              maxLength={30}
+              minLength={2}
+              onChange={(event) => setName(event.target.value)}
+              required
+              value={name}
             />
           </label>
-        </div>
-
-        {/* ── Age + difficulty ── */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="field-label">Age band</span>
-            <select
-              className="form-input mt-1"
-              value={formState.ageBand}
-              onChange={(e) =>
-                setFormState((s) => ({
-                  ...s,
-                  ageBand: e.target.value as "6_to_8" | "9_to_11" | "12_to_14" | "15_plus",
-                }))
-              }
-            >
-              <option value="6_to_8">6 – 8 years</option>
-              <option value="9_to_11">9 – 11 years</option>
-              <option value="12_to_14">12 – 14 years</option>
-              <option value="15_plus">15 +</option>
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="field-label">Difficulty</span>
-            <select
-              className="form-input mt-1"
-              value={formState.difficultyMode}
-              onChange={(e) =>
-                setFormState((s) => ({
-                  ...s,
-                  difficultyMode: e.target.value as "easy" | "medium" | "hard" | "adaptive",
-                }))
-              }
-            >
-              <option value="adaptive">Adaptive (recommended)</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </label>
-        </div>
-
-        {/* ── Avatar color ── */}
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={rememberProfile} onChange={(event) => setRememberProfile(event.target.checked)} />
-          Remember my name and age on this device
-        </label>
-        <div>
-          <p className="field-label">Avatar colour</p>
-          <div className="flex flex-wrap gap-3 mt-2">
-            {avatarColors.map((color) => {
-              const selected = formState.avatarColor === color;
-              return (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setFormState((s) => ({ ...s, avatarColor: color }))}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    border: selected ? "3px solid var(--ink)" : "2.5px solid transparent",
-                    boxShadow: selected ? "0 0 0 2px var(--card), 0 0 0 4px var(--ink)" : "none",
-                    outline: "none",
-                    cursor: "pointer",
-                    transform: selected ? "scale(1.15)" : "scale(1)",
-                    transition: "transform 120ms, box-shadow 120ms",
-                    flexShrink: 0,
-                  }}
-                  className={`avatar-${color}`}
-                  aria-label={`Avatar colour: ${color}`}
-                  aria-pressed={selected}
-                />
-              );
-            })}
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-center gap-3 mt-4">
-            <div
-              className={`avatar avatar-md avatar-${formState.avatarColor}`}
-              aria-hidden="true"
-            >
-              {formState.displayName.charAt(0).toUpperCase() || "P"}
+          <fieldset>
+            <legend className="field-label">Your age</legend>
+            <div className="grid grid-cols-4 gap-2">
+              {ageBands.map(({ value, label }) => (
+                <label key={value} className={classNames("cat-pill px-1! focus-within:ring-2", ageBand === value && "active")}>
+                  <input checked={ageBand === value} className="sr-only" name="ageBand" onChange={() => setAgeBand(value)} required type="radio" />
+                  <span className="mx-auto whitespace-nowrap">{label}</span>
+                </label>
+              ))}
             </div>
-            <div>
-              <p
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 700,
-                  fontSize: "0.9375rem",
-                  color: "var(--ink)",
-                }}
-              >
-                {formState.displayName || "Player"}
-              </p>
-              <p style={{ fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
-                {formState.ageBand.replaceAll("_", " ")} · {formState.difficultyMode}
-              </p>
+          </fieldset>
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold">More options</summary>
+            <div className="space-y-4 pt-2">
+              <label className="block">
+                <span className="field-label">Difficulty</span>
+                <select className="form-input" onChange={(event) => setDifficultyMode(event.target.value as Profile["difficultyMode"])} value={difficultyMode}>
+                  <option value="adaptive">Adaptive (recommended)</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <div>
+                <p className="field-label">Avatar colour</p>
+                <div className="flex flex-wrap gap-3">
+                  {avatarColors.map((color) => (
+                    <button
+                      key={color}
+                      aria-label={`Avatar colour: ${color}`}
+                      aria-pressed={avatarColor === color}
+                      className={classNames("avatar avatar-md", `avatar-${color}`, avatarColor === color && "ring-2 ring-offset-2 ring-[var(--ink)]")}
+                      onClick={() => setAvatarColor(color)}
+                      type="button"
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
+          </details>
+          {error ? <p className="alert-error">{error}</p> : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <button className={primaryButtonClass} disabled={isSubmitting} type="submit">{isSubmitting ? "Joining…" : "Join the game"}</button>
+            <Link className={secondaryButtonClass} href="/">Back home</Link>
           </div>
-        </div>
-
-        {error ? <p className="alert-error">{error}</p> : null}
-
-        {/* ── Actions ── */}
-        <div className="flex flex-wrap gap-3 pt-2">
-          <button
-            className={primaryButtonClass}
-            disabled={isSubmitting || !formState.roomCode || !formState.displayName}
-            onClick={() => startTransition(() => void submit())}
-            type="button"
-          >
-            {isSubmitting ? "Joining…" : "Join the game"}
-          </button>
-          <Link className={secondaryButtonClass} href="/">
-            Back home
-          </Link>
-        </div>
-      </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input checked={remember} onChange={(event) => setRemember(event.target.checked)} type="checkbox" />
+            Remember my name and age on this device
+          </label>
+        </form>
+      )}
     </div>
   );
 }

@@ -2,8 +2,7 @@ import type { AgeBand, Category, Question, QuestionDifficulty } from "@/types/ga
 import { questionQualityIssues } from "@/lib/questions/quality";
 
 type Item = [AgeBand, QuestionDifficulty, string, string, string, string, string, string];
-// Authored starter material with explicit prerequisites. The legacy bank is not
-// relabelled or truncated. Educators can expand these pools through reviewed imports.
+// Test-only fixtures. Production questions come exclusively from the database.
 const science: Item[] = [
   ["6_to_8", "easy", "What does an ice cube become when it melts?", "Water", "Steam", "Snow", "Salt", "Melting changes solid ice into liquid water."],
   ["6_to_8", "easy", "Which part of a plant takes in water from soil?", "Roots", "Flowers", "Leaves", "Seeds", "Roots absorb water from the soil."],
@@ -67,7 +66,7 @@ const planet: Item[] = [
   ["6_to_8", "medium", "Which animal can breathe underwater using gills?", "Trout", "Rabbit", "Pigeon", "Lizard", "Trout are fish and use gills to take oxygen from water."],
   ["9_to_11", "easy", "Which source of energy is renewable?", "Sunlight", "Coal", "Petrol", "Natural gas", "Sunlight is replenished naturally, unlike fossil fuels."],
   ["9_to_11", "medium", "In grass, rabbit, fox, which is the producer?", "Grass", "Rabbit", "Fox", "All three", "Grass makes its own food using sunlight."],
-  ["12_to_14", "easy", "Which gas do plants absorb during photosynthesis?", "Carbon dioxide", "Oxygen", "Hydrogen", "Helium", "Plants use carbon dioxide and water to make sugars."],
+  ["12_to_14", "easy", "Which gas do plants absorb during photosynthesis?", "Carbon dioxide", "Pure oxygen", "Hydrogen gas", "Helium gas", "Plants use carbon dioxide and water to make sugars."],
   ["12_to_14", "medium", "Fertiliser enters a lake and algae grow rapidly. What may happen as the algae decay?", "Dissolved oxygen decreases", "Dissolved oxygen always doubles", "All bacteria disappear", "Water becomes pure", "Decomposers use oxygen while breaking down dead algae."],
   ["15_plus", "medium", "Why does greater biodiversity often improve ecosystem resilience?", "Species can fill overlapping roles", "Every species needs identical food", "Predators always disappear", "Climate stops changing", "Overlapping ecological roles can buffer the loss or decline of one species."],
   ["15_plus", "hard", "Which change is a positive climate feedback?", "Melting ice reduces reflectivity", "Clouds reflect more incoming sunlight", "Extra plant growth stores carbon", "Warmer surfaces radiate more heat", "Less reflective ice exposes darker surfaces, increasing absorption and further warming."],
@@ -80,7 +79,7 @@ const logic: Item[] = [
   ["12_to_14", "easy", "A program repeats a step until a condition is met. What is this structure?", "Loop", "Variable", "Comment", "Constant", "A loop repeats instructions according to a condition."],
   ["12_to_14", "medium", "If it rains, the path gets wet. The path is wet. What can you conclude?", "Rain is one possible cause", "It definitely rained", "Rain is impossible", "The rule is false", "Other causes, such as a hose, can also make the path wet."],
   ["15_plus", "medium", "Which search method halves a sorted search range at each step?", "Binary search", "Linear search", "Random search", "Exhaustive search", "Binary search repeatedly divides a sorted range in half."],
-  ["15_plus", "hard", "What is the logical negation of 'Every bird can fly'?", "At least one bird cannot fly", "No bird can fly", "Every bird can fly", "Some birds can fly", "One counterexample is sufficient to negate a universal statement."],
+  ["15_plus", "hard", "What is the logical negation of 'Every bird can fly'?", "Some birds cannot fly", "No bird can fly", "Every bird can fly", "Some birds can fly", "One counterexample is sufficient to negate a universal statement."],
 ];
 
 science.push(
@@ -105,7 +104,7 @@ language.push(
 );
 society.push(
   ["6_to_8", "easy", "Who helps pupils learn in a classroom?", "Teacher", "Pilot", "Farmer", "Dentist", "Teaching pupils is a teacher's main classroom role."],
-  ["6_to_8", "medium", "You find a lost lunchbox at school. What should you do?", "Give it to a teacher", "Throw it away", "Hide it outside", "Take it home", "A teacher can help return the lunchbox to its owner."],
+  ["6_to_8", "medium", "You find a lost lunchbox at school. What should you do?", "Tell a teacher", "Throw it away", "Hide it outside", "Take it home", "A teacher can help return the lunchbox to its owner."],
   ["6_to_8", "easy", "Which is something everyone needs to stay healthy?", "Clean water", "A new toy", "A gold ring", "A game console", "Clean drinking water is a basic human need."],
   ["9_to_11", "easy", "Which service helps people borrow books?", "Library", "Fire station", "Post office", "Airport", "Libraries lend books and other learning materials."],
   ["9_to_11", "medium", "You have 20 coins and spend 7. How many can you save?", "13", "27", "7", "14", "Subtract spending from the starting amount: 20 - 7 = 13."],
@@ -126,7 +125,7 @@ history.push(
   ["9_to_11", "hard", "An old coin is found at a site. What can it directly help researchers identify?", "The coin's place of origin", "Every resident's name", "Tomorrow's weather", "The exact population", "A coin's markings can identify where it was issued, though further evidence is needed about the site."],
   ["12_to_14", "easy", "Which term describes the movement of people to a new place to live?", "Migration", "Rotation", "Erosion", "Inflation", "Migration is movement from one place to another to live."],
   ["12_to_14", "medium", "Why should historians compare sources written by opposing sides?", "To examine different perspectives", "To avoid checking facts", "To guarantee identical accounts", "To remove all dates", "Comparing perspectives can reveal disagreement, omissions and bias."],
-  ["12_to_14", "hard", "Which claim confuses sequence with causation?", "B followed A, so A caused B", "A and B occurred together", "A happened before B", "B was recorded after A", "An event occurring after another does not prove a causal link."],
+  ["12_to_14", "hard", "Which claim confuses sequence with causation?", "B followed A; A caused B", "A and B occurred together", "A happened before B", "B was recorded after A", "An event occurring after another does not prove a causal link."],
   ["15_plus", "easy", "Which term describes an object placed in the wrong historical period?", "Anachronism", "Archive", "Chronology", "Artifact", "An anachronism is inconsistent with the time period shown."],
   ["15_plus", "medium", "A source is written decades after an event. Which limitation is especially relevant?", "Memory may have changed", "It cannot contain any facts", "It must be a forgery", "Its author cannot be identified", "Memory can change over time; later accounts still need careful evaluation."],
   ["15_plus", "hard", "A new primary source challenges an accepted account. What is the best historical response?", "Reassess the interpretation", "Discard the source automatically", "Accept every detail immediately", "Stop comparing other sources", "Historians evaluate new evidence and revise interpretations when warranted."],
@@ -161,9 +160,9 @@ planet.push(
 );
 logic.push(
   ["6_to_8", "easy", "What comes next: 2, 4, 6, 8?", "10", "9", "11", "12", "The pattern adds two each time."],
-  ["6_to_8", "medium", "A box holds only red balls. You pick one without looking. What colour must it be?", "Red", "Blue", "Green", "Yellow", "Every ball in the box is red."],
+  ["6_to_8", "medium", "A box holds only red balls. You pick one. What colour is it?", "Red", "Blue", "Green", "Yellow", "Every ball in the box is red."],
   ["6_to_8", "easy", "Which shape has no corners?", "Circle", "Triangle", "Square", "Rectangle", "A circle is curved and has no corners."],
-  ["9_to_11", "easy", "Which instruction is most precise?", "Move forward three steps", "Move a little", "Go somewhere", "Walk for a bit", "A specific number of steps makes the instruction clearer."],
+  ["9_to_11", "easy", "Which instruction is most precise?", "Walk three steps", "Walk a little", "Go somewhere", "Walk for a bit", "A specific number of steps makes the instruction clearer."],
   ["9_to_11", "medium", "Ava is taller than Ben. Ben is taller than Cara. Who is tallest?", "Ava", "Ben", "Cara", "They are equal", "The two comparisons place Ava above both Ben and Cara."],
   ["9_to_11", "hard", "A code changes CAT to DBU by shifting each letter one place. What does DOG become?", "EPH", "CNG", "FQI", "EOG", "D becomes E, O becomes P, and G becomes H."],
   ["12_to_14", "easy", "Which value can a Boolean variable hold?", "True", "Twenty", "A paragraph", "A photograph", "A Boolean represents one of two logical values: true or false."],

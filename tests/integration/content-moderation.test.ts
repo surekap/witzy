@@ -1,11 +1,9 @@
 import { vi } from "vitest";
-import { buildQuickQuestions } from "@/lib/questions/quick-bank";
+import { buildQuickQuestions } from "@/tests/fixtures/age-banded-questions";
 
-const state = vi.hoisted(() => ({ disabled: [] as string[] }));
 const category = { id: "math", slug: "math", name: "Math", icon: "", active: true };
 vi.mock("@/lib/db/convex", () => ({
   runConvexQuery: vi.fn(async (name: string) => {
-    if (name === "questionBank:listDisabledQuickQuestions") return state.disabled;
     if (name === "questionBank:getActiveQuestionBankVersion") return "moderation-test";
     if (name === "questionBank:listQuestionBankCategories") return [category];
     if (name === "questionBank:listQuestionBankQuestionsPage") {
@@ -13,32 +11,30 @@ vi.mock("@/lib/db/convex", () => ({
     }
     throw new Error(`Unexpected query: ${name}`);
   }),
-  runConvexMutation: vi.fn(async (_name: string, args: { questionIds: string[] }) => {
-    state.disabled.push(...args.questionIds);
-  }),
+  runConvexMutation: vi.fn(),
 }));
 vi.mock("@/lib/db/question-bank", () => ({ replaceQuestionBank: vi.fn() }));
-import { loadQuickQuestionsFromDatabase } from "@/lib/db/runtime-storage";
+import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
 import { removeQuestionsFromAdmin } from "@/lib/admin/service";
 import { replaceQuestionBank } from "@/lib/db/question-bank";
 import { runConvexMutation } from "@/lib/db/convex";
 
-describe("starter question moderation", () => {
-  beforeEach(() => { state.disabled = []; vi.clearAllMocks(); });
+describe("single database question pool", () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it("applies the persistent blocklist without changing the authored source", async () => {
-    const source = buildQuickQuestions([category]);
-    state.disabled = [source[0].id];
-    const playable = await loadQuickQuestionsFromDatabase([category]);
-    expect(playable).toHaveLength(source.length - 1);
-    expect(playable.some((question) => question.id === source[0].id)).toBe(false);
-    expect(buildQuickQuestions([category])).toHaveLength(source.length);
+  it("loads only database questions, never an additional compiled starter pool", async () => {
+    const bank = await loadQuestionBankFromDatabase();
+    expect(bank.questions.map((question) => question.id)).toEqual(["legacy-question"]);
   });
 
-  it("removes a starter through admin without replacing the legacy bank", async () => {
+  it("serves the cached bank without copying it", async () => {
+    expect(await loadQuestionBankFromDatabase()).toBe(await loadQuestionBankFromDatabase());
+  });
+
+  it("does not treat removed starter IDs as live questions", async () => {
     const id = buildQuickQuestions([category])[0].id;
-    expect((await removeQuestionsFromAdmin([id, id])).removedCount).toBe(1);
-    expect(runConvexMutation).toHaveBeenCalledWith("questionBank:disableQuickQuestions", { questionIds: [id] });
+    expect((await removeQuestionsFromAdmin([id, id])).removedCount).toBe(0);
+    expect(runConvexMutation).not.toHaveBeenCalled();
     expect(replaceQuestionBank).not.toHaveBeenCalled();
     expect((await removeQuestionsFromAdmin([id])).removedCount).toBe(0);
   });

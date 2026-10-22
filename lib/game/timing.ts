@@ -1,8 +1,12 @@
-import { questionWordCount } from "@/lib/questions/quality";
-import type { AgeBand, GameConfig, Question, QuestionDifficulty } from "@/types/game";
+import { isReviewedQuestion, questionWordCount } from "@/lib/questions/quality";
+import type { AgeBand, GameConfig, GameRoom, GameRound, Question, QuestionDifficulty } from "@/types/game";
 
 export const SUBMISSION_GRACE_MS = 1500;
 export const ROUND_PREPARE_MS = 2500;
+// Clients beat every 15s (components/room-page-client.tsx); two missed beats and a bit more is "away".
+export const PRESENCE_TIMEOUT_MS = 45_000;
+// Receipt time is judged at the Next route, so the hop to Convex is free; a request that crawled in much later than that is refused.
+export const MAX_RELAY_MS = 10_000;
 export const TARGET_COMPLETION_PERCENTILE = 0.8;
 export interface TimingSample { ageBand: AgeBand; difficulty: QuestionDifficulty; words: number; seconds: number; timedOut: boolean }
 const readingWordsPerMinute: Record<AgeBand, number> = { "6_to_8": 60, "9_to_11": 90, "12_to_14": 120, "15_plus": 150 };
@@ -33,4 +37,18 @@ export function roundDurationSeconds(assignments: Array<{ question: Question; ag
   if (typeof config.answerTimeLimitSeconds === "number") return config.answerTimeLimitSeconds;
   const multiplier = config.answerTimeLimitSeconds === "relaxed" ? 1.5 : 1;
   return Math.ceil(Math.max(20, ...assignments.map(({ question, ageBand }) => questionAllowanceSeconds(question, ageBand, samples))) * multiplier / 5) * 5;
+}
+
+// Calibration data from a locked round. Fixed timers measure the host's limit rather than how long children need, so they teach nothing about "auto".
+export function roundTimingSamples(room: GameRoom, round: GameRound): TimingSample[] {
+  if (typeof room.config.answerTimeLimitSeconds === "number") return [];
+  return round.assignments.flatMap((assignment) => {
+    const player = room.players.find((entry) => entry.id === assignment.gamePlayerId);
+    const timedOut = assignment.answer?.submittedAnswer === null && Date.parse(round.lockedAt!) >= Date.parse(round.endsAt!);
+    if (!player || assignment.hintUsed || !isReviewedQuestion(assignment.questionSnapshot) || assignment.questionSnapshot.modality !== "text" || (!assignment.answer?.isCorrect && !timedOut)) return [];
+    const seconds = timedOut ? (Date.parse(round.endsAt!) - Date.parse(round.startedAt!)) / 1000 : assignment.answer!.responseMs! / 1000;
+    return Number.isFinite(seconds) && seconds >= 0
+      ? [{ ageBand: player.ageBand, difficulty: assignment.assignedDifficulty, words: questionWordCount(assignment.questionSnapshot), seconds, timedOut }]
+      : [];
+  });
 }

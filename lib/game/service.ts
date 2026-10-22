@@ -7,7 +7,6 @@ import {
   insertRoomStateIntoDatabase,
   loadAllRoomStatesFromDatabase,
   loadQuestionBankFromDatabase,
-  loadQuickQuestionsFromDatabase,
   loadCategoriesFromDatabase,
   loadRoomStateFromDatabase,
   updateRoomStateInDatabase,
@@ -17,12 +16,10 @@ import { scoreRoundAnswers } from "@/lib/scoring/score-round";
 import { getStore } from "@/lib/game/store";
 import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
 import { recordRoomAnswer } from "@/lib/game/answer";
-import { buildQuickQuestions } from "@/lib/questions/quick-bank";
-import { isQuickQuestion, questionWordCount } from "@/lib/questions/quality";
 import { shuffleQuestionOptions } from "@/lib/questions/shuffle";
-import { ROUND_PREPARE_MS, SUBMISSION_GRACE_MS, roundDurationSeconds, type TimingSample } from "@/lib/game/timing";
+import { PRESENCE_TIMEOUT_MS, ROUND_PREPARE_MS, SUBMISSION_GRACE_MS, roundDurationSeconds, roundTimingSamples, type TimingSample } from "@/lib/game/timing";
 import { env } from "@/lib/utils/env";
-import { createId, createRoomCode, createSessionKey, stableIndex } from "@/lib/utils/ids";
+import { createId, createRoomCode, createSessionKey } from "@/lib/utils/ids";
 import type {
   AgeBand,
   AnswerKey,
@@ -75,7 +72,7 @@ function touchPlayer(player: GamePlayer) {
 }
 
 function refreshPresence(room: GameRoom) {
-  const cutoff = Date.now() - 10_000;
+  const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
   for (const player of room.players) {
     player.isConnected = new Date(player.lastSeenAt).getTime() >= cutoff;
   }
@@ -135,7 +132,7 @@ function updatePlayerStreak(player: GamePlayer, isCorrect: boolean) {
   }
 }
 
-function chooseCategory(room: GameRoom, requestedCategoryId?: string) {
+function chooseCategory(room: GameRoom, questions: Question[], usedQuestionIds: Set<string>, requestedCategoryId?: string) {
   if (requestedCategoryId) {
     if (!room.config.enabledCategoryIds.includes(requestedCategoryId)) {
       throw new GameError("That category is not enabled for this game.", 400);
@@ -144,13 +141,18 @@ function chooseCategory(room: GameRoom, requestedCategoryId?: string) {
     return requestedCategoryId;
   }
 
-  const enabledCategories = room.config.enabledCategoryIds;
-  if (enabledCategories.length === 0) {
-    throw new GameError("This room doesn't have any categories enabled.", 400);
-  }
+  // Prefer a category not yet played whose unused questions cover every player's age band, then any with unused
+  // questions, then any playable with repeats. Random within a tier, so a retry can never meet the same dead end.
+  const unused = questions.filter((question) => !usedQuestionIds.has(question.id));
+  const played = new Set(room.rounds.map((round) => round.categoryId));
+  const covers = (pool: Question[]) => (categoryId: string) =>
+    getMissingAgeBandsForCategory({ categoryId, players: room.players, questions: pool }).length === 0;
+  const enabled = room.config.enabledCategoryIds;
+  const choices = [enabled.filter((id) => !played.has(id)).filter(covers(unused)), enabled.filter(covers(unused)), enabled.filter(covers(questions))]
+    .find((tier) => tier.length > 0);
+  if (!choices) throw new GameError("No enabled category has questions for every player's age band.", 400);
 
-  const selectedIndex = stableIndex(`${room.id}:${room.currentRoundNumber + 1}`, enabledCategories.length);
-  return enabledCategories[selectedIndex];
+  return choices[Math.floor(Math.random() * choices.length)];
 }
 
 function getAgeBandLabel(ageBand: AgeBand) {
@@ -167,46 +169,6 @@ function getAgeBandLabel(ageBand: AgeBand) {
   }
 
   return "15+ years";
-}
-
-function normalizePlayerHistoryKey(playerId: string, ageBand: AgeBand) {
-  return `${playerId}::${ageBand}`;
-}
-
-type HistoricalQuestionHistory = {
-  seenQuestionIds: Set<string>;
-  correctlyAnsweredQuestionIds: Set<string>;
-};
-
-function buildHistoricalQuestionHistory(rooms: Iterable<GameRoom>) {
-  const historyByPlayer = new Map<string, HistoricalQuestionHistory>();
-
-  for (const room of rooms) {
-    const playersById = new Map(room.players.map((player) => [player.id, player]));
-    for (const round of room.rounds) {
-      for (const assignment of round.assignments) {
-        const player = playersById.get(assignment.gamePlayerId);
-        if (!player) {
-          continue;
-        }
-
-        const key = normalizePlayerHistoryKey(player.id, player.ageBand);
-        const existing = historyByPlayer.get(key) ?? {
-          seenQuestionIds: new Set<string>(),
-          correctlyAnsweredQuestionIds: new Set<string>(),
-        };
-
-        existing.seenQuestionIds.add(assignment.questionId);
-        if (assignment.answer?.isCorrect) {
-          existing.correctlyAnsweredQuestionIds.add(assignment.questionId);
-        }
-
-        historyByPlayer.set(key, existing);
-      }
-    }
-  }
-
-  return historyByPlayer;
 }
 
 function getMissingAgeBandsForCategory(params: {
@@ -305,7 +267,6 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
       status: room.status,
       currentRoundNumber: room.currentRoundNumber,
       config: room.config,
-      joinUrl: `${env.NEXT_PUBLIC_APP_URL}/join?room=${room.roomCode}`,
       createdAt: room.createdAt,
     },
     viewer,
@@ -331,7 +292,7 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
             endsAt: currentRound.endsAt,
             startedAt: currentRound.startedAt,
             answerStats: {
-              totalPlayers: room.players.length,
+              totalPlayers: currentRound.assignments.length,
               answeredPlayers: currentRound.assignments.filter((entry) => entry.answer !== null).length,
             },
           }
@@ -342,7 +303,7 @@ function buildRoomView(room: GameRoom, viewer: RoomViewer): RoomStateView {
             assignedQuestionId: playerQuestion.id,
             questionId: playerQuestion.questionId,
             assignedDifficulty: playerQuestion.assignedDifficulty,
-            title: playerQuestion.questionSnapshot.title,
+            // No title while answering: titles often name the answer, and every extra word slows the round.
             prompt: playerQuestion.questionSnapshot.prompt,
             modality: playerQuestion.questionSnapshot.modality,
             answerType: playerQuestion.questionSnapshot.answerType,
@@ -393,7 +354,9 @@ function scoreRound(room: GameRoom, round: GameRound) {
       hintUsed: assignment.hintUsed,
     })),
     {
-      fastestCorrectBonus: room.config.fastestCorrectBonus && new Set(room.players.map((player) => player.ageBand)).size === 1,
+      // Mixed ages are judged among the players actually in this round, not one who joined during it.
+      fastestCorrectBonus: room.config.fastestCorrectBonus &&
+        new Set(round.assignments.map((assignment) => room.players.find((player) => player.id === assignment.gamePlayerId)?.ageBand)).size === 1,
       teamBonus: room.config.teamBonus,
       equalBasePoints: room.config.equalBasePoints,
     },
@@ -521,13 +484,17 @@ function joinRoomInMemory(
 ) {
   const room = getRoomOrThrow(roomCode);
 
+  if (existingSessionKey && existingSessionKey === room.hostSessionKey) {
+    throw new GameError("This device is hosting the room. Open the join link on another device to play.", 409);
+  }
   const returningPlayer = room.players.find((player) => existingSessionKey && player.sessionKey === existingSessionKey);
   if (returningPlayer) {
     touchPlayer(returningPlayer);
     return { roomCode: room.roomCode, sessionKey: returningPlayer.sessionKey, playerId: returningPlayer.id };
   }
-  if (room.status !== "lobby") {
-    throw new GameError("This room has already started, so new players can't join right now.", 409);
+  // Anyone may join until the game ends; rounds already started keep their assignments, so a latecomer plays from the next one.
+  if (room.status === "finished") {
+    throw new GameError("This game has already finished.", 409);
   }
 
   const normalizedName = input.displayName.trim();
@@ -614,19 +581,16 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
     throw new GameError("This game already reached its round limit.", 409);
   }
 
-  const categoryId =
-    room.config.categoryMode === "host_selects_each_round"
-      ? chooseCategory(room, requestedCategoryId)
-      : chooseCategory(room);
-
+  const questions = getStore().questions;
   const usedQuestionIds = new Set(
     room.rounds.flatMap((round) => round.assignments.map((assignment) => assignment.questionId)),
   );
-  const historicalQuestionHistory = buildHistoricalQuestionHistory(getStore().rooms.values());
-
-  const questions = room.config.questionMode === "quick"
-    ? [...getStore().questions, ...(env.USE_MEMORY_STORE ? buildQuickQuestions(getStore().categories) : [])].filter(isQuickQuestion)
-    : getStore().questions;
+  const categoryId = chooseCategory(
+    room,
+    questions,
+    usedQuestionIds,
+    room.config.categoryMode === "host_selects_each_round" ? requestedCategoryId : undefined,
+  );
   const missingAgeBands = getMissingAgeBandsForCategory({
     categoryId,
     players: room.players,
@@ -642,48 +606,16 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
   }
 
   const assignments = room.players.map((player) => {
-    const targetDifficulty = resolvePlayerDifficulty(player);
-    const historicalKey = normalizePlayerHistoryKey(player.id, player.ageBand);
-    const correctlyAnsweredQuestionIds = room.config.questionMode === "quick" ? new Set<string>() :
-      historicalQuestionHistory.get(historicalKey)?.correctlyAnsweredQuestionIds ?? new Set<string>();
-    const usedAndMasteredQuestionIds = new Set([
-      ...usedQuestionIds,
-      ...correctlyAnsweredQuestionIds,
-    ]);
-    const unseenForPlayer = questions.filter((candidate) => candidate.categoryId === categoryId &&
-      isQuestionAgeCompatible(candidate, player.ageBand) &&
-      !historicalQuestionHistory.get(historicalKey)?.seenQuestionIds.has(candidate.id));
     const question = assignQuestionForPlayer({
-      questions: room.config.questionMode === "quick" && unseenForPlayer.length ? unseenForPlayer : questions,
+      questions,
       categoryId,
       ageBand: player.ageBand,
-      targetDifficulty,
-      usedQuestionIds: usedAndMasteredQuestionIds,
-      excludedQuestionIds: correctlyAnsweredQuestionIds,
+      targetDifficulty: resolvePlayerDifficulty(player),
+      usedQuestionIds,
     });
 
     if (!question) {
-      const questionIgnoringCorrectHistory =
-        correctlyAnsweredQuestionIds.size > 0
-          ? assignQuestionForPlayer({
-              questions,
-              categoryId,
-              ageBand: player.ageBand,
-              targetDifficulty,
-              usedQuestionIds,
-            })
-          : null;
-
       const categoryName = getCategoryById(categoryId)?.name ?? "That category";
-      if (questionIgnoringCorrectHistory) {
-        throw new GameError(
-          `${categoryName} has no new questions left for ${player.displayName} (${getAgeBandLabel(
-            player.ageBand,
-          )}) because they already answered the available questions correctly.`,
-          400,
-        );
-      }
-
       throw new GameError(
         `${categoryName} did not have a valid question for ${player.displayName} (${getAgeBandLabel(
           player.ageBand,
@@ -706,22 +638,12 @@ function startRoundInMemory(roomCode: string, sessionKey: string | null, request
     };
   });
 
-  const timingSamples = getStore().timingSamples ?? room.rounds.filter((round) => round.status === "revealed").flatMap((round) =>
-    round.assignments.filter((assignment) => !assignment.hintUsed && isQuickQuestion(assignment.questionSnapshot) && assignment.questionSnapshot.modality === "text" &&
-      (assignment.answer?.isCorrect || (assignment.answer?.submittedAnswer === null && Date.parse(round.lockedAt!) >= Date.parse(round.endsAt!)))).map((assignment) => ({
-      ageBand: room.players.find((player) => player.id === assignment.gamePlayerId)!.ageBand,
-      difficulty: assignment.questionSnapshot.difficulty,
-      words: questionWordCount(assignment.questionSnapshot),
-      seconds: assignment.answer?.responseMs != null ? assignment.answer.responseMs / 1000 : (Date.parse(round.endsAt!) - Date.parse(round.startedAt!)) / 1000,
-      timedOut: assignment.answer?.submittedAnswer === null,
-    })),
-  );
+  const timingSamples = getStore().timingSamples ?? room.rounds.filter((round) => round.status === "revealed").flatMap((round) => roundTimingSamples(room, round));
   const duration = roundDurationSeconds(assignments.map((assignment) => ({
     question: assignment.questionSnapshot,
     ageBand: room.players.find((player) => player.id === assignment.gamePlayerId)!.ageBand,
-  })), room.config, room.config.questionMode === "quick" ? timingSamples : []);
-  const prepareMs = typeof room.config.answerTimeLimitSeconds === "string" ? ROUND_PREPARE_MS : 0;
-  const startedAt = new Date(Date.now() + prepareMs);
+  })), room.config, timingSamples);
+  const startedAt = new Date(Date.now() + ROUND_PREPARE_MS);
   const endsAt = new Date(startedAt.getTime() + duration * 1000);
 
   room.currentRoundNumber += 1;
@@ -905,7 +827,6 @@ async function withScratchStore<T>(
   const { categories, questions } = options.needsQuestions
     ? await loadQuestionBankFromDatabase()
     : { categories: await loadCategoriesFromDatabase(), questions: [] as Question[] };
-  if (options.needsQuestions) questions.push(...await loadQuickQuestionsFromDatabase(categories));
   const rooms = new Map<string, GameRoom>();
   let version: number | null = null;
 
@@ -1062,7 +983,7 @@ export async function submitAnswer(
   }
 
   if (!sessionKey) throw new GameError("Join this room before answering.", 403);
-  await runConvexMutation("rooms:submitAnswer", { roomCode: roomCode.toUpperCase(), sessionKey, ...input });
+  await runConvexMutation("rooms:submitAnswer", { roomCode: roomCode.toUpperCase(), sessionKey, ...input, receivedAt });
   return getRoomState(roomCode, sessionKey);
 }
 
@@ -1084,6 +1005,8 @@ export async function applyRoomHint(roomCode: string, sessionKey: string | null,
       throw new GameError("Hints are not available for this question now.", 409);
     }
     if (!room.config.hints) throw new GameError("Hints are disabled.", 403);
+    // Removing two wrong options from a 2- or 3-option question would reveal the answer.
+    if (Object.keys(assignment.questionSnapshot.options).length !== 4) throw new GameError("Hints are only available for four-choice questions.", 409);
     if (!assignment.hintUsed) {
       if (player.hintUsesRemaining <= 0) throw new GameError("You already used your hint.", 409);
       assignment.hintUsed = true;
@@ -1095,12 +1018,14 @@ export async function applyRoomHint(roomCode: string, sessionKey: string | null,
 }
 
 export async function heartbeatRoom(roomCode: string, sessionKey: string | null) {
-  const action = () => {
-    const room = getRoomOrThrow(roomCode);
-    touchPlayer(getPlayerBySession(room, sessionKey));
+  if (env.USE_MEMORY_STORE) {
+    getPlayerBySession(getRoomOrThrow(roomCode), sessionKey);
     return { ok: true };
-  };
-  return env.USE_MEMORY_STORE ? action() : withPersistedRoom(roomCode, action);
+  }
+
+  // Presence never goes through withPersistedRoom: it must not bump the room version.
+  if (!sessionKey) throw new GameError("Join this room first.", 403);
+  return runConvexMutation<{ roomCode: string; sessionKey: string }, { ok: true }>("rooms:touchPresence", { roomCode: roomCode.toUpperCase(), sessionKey });
 }
 
 export async function revealRound(roomCode: string, sessionKey: string | null) {

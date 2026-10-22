@@ -1,6 +1,6 @@
-import { runConvexMutation, runConvexQuery } from "@/lib/db/convex";
+import { runConvexQuery } from "@/lib/db/convex";
 import { replaceQuestionBank } from "@/lib/db/question-bank";
-import { loadQuestionBankFromDatabase, loadQuickQuestionsFromDatabase } from "@/lib/db/runtime-storage";
+import { loadQuestionBankFromDatabase } from "@/lib/db/runtime-storage";
 import { isQuestionAgeCompatible } from "@/lib/questions/assignment";
 import { normalizeImportedQuestionBank } from "@/lib/questions/import-format";
 import { getQuestionFlagSummaries } from "@/lib/question-flags/service";
@@ -482,7 +482,7 @@ function buildPlayerQuestionAvailabilityMatrix(params: {
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  const [{ categories, questions: bankQuestions }, flaggedQuestions, accounts, attempts, roomStates] = await Promise.all([
+  const [{ categories, questions }, flaggedQuestions, accounts, attempts, roomStates] = await Promise.all([
     loadQuestionBankFromDatabase(),
     getQuestionFlagSummaries(),
     runConvexQuery<Record<string, never>, PracticeAccountRow[]>("practice:listAccounts", {}),
@@ -490,7 +490,6 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     runConvexQuery<Record<string, never>, PersistedRoomStateRow[]>("rooms:listRoomStates", {}),
   ]);
 
-  const questions = [...bankQuestions, ...await loadQuickQuestionsFromDatabase(categories)];
   const frequency = buildFrequencyDistribution(categories, questions);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const flagByQuestionId = new Map(flaggedQuestions.map((summary) => [summary.questionId, summary]));
@@ -582,8 +581,6 @@ export async function removeQuestionsFromAdmin(questionIds: string[]): Promise<A
   const uniqueQuestionIds = [...new Set(questionIds.map((questionId) => questionId.trim()).filter(Boolean))];
   const questionIdSet = new Set(uniqueQuestionIds);
   const existingQuestionBank = await loadQuestionBankFromDatabase();
-  const quickQuestions = await loadQuickQuestionsFromDatabase(existingQuestionBank.categories);
-  const removedQuickIds = quickQuestions.filter((question) => questionIdSet.has(question.id)).map((question) => question.id);
   const cleanedQuestions = existingQuestionBank.questions.filter(
     (question) => !questionIdSet.has(question.id),
   );
@@ -591,11 +588,8 @@ export async function removeQuestionsFromAdmin(questionIds: string[]): Promise<A
   if (removedBankCount > 0) {
     await replaceQuestionBank({ categories: existingQuestionBank.categories, questions: cleanedQuestions });
   }
-  if (removedQuickIds.length > 0) {
-    await runConvexMutation("questionBank:disableQuickQuestions", { questionIds: removedQuickIds });
-  }
   return {
-    removedCount: removedBankCount + removedQuickIds.length,
-    remainingQuestionCount: cleanedQuestions.length + quickQuestions.length - removedQuickIds.length,
+    removedCount: removedBankCount,
+    remainingQuestionCount: cleanedQuestions.length,
   };
 }

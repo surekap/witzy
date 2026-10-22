@@ -33,7 +33,6 @@ The app now expects Convex for runtime storage. Rooms, account-backed practice p
 
 - `NEXT_PUBLIC_CONVEX_URL`: Convex deployment URL used by the app and server-side data bridge
 - `CONVEX_ADMIN_KEY`: Optional server-only key for privileged Convex calls
-- `NEXT_PUBLIC_APP_URL`: Base URL for join links. Set this to `https://witzy.sureka.family` in production.
 - `SESSION_SECRET`: Long random string for production deployments
 - `ADMIN_PANEL_PASSWORD`: Required for `/admin` sign-in and admin APIs
 - `MEDIA_BASE_URL`: Optional future override for hosted media assets

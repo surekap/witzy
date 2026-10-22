@@ -8,10 +8,12 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
 import type * as practice from "../practice.js";
 import type * as questionBank from "../questionBank.js";
 import type * as questionFlags from "../questionFlags.js";
 import type * as rooms from "../rooms.js";
+import type * as security from "../security.js";
 import type * as snapshot from "../snapshot.js";
 
 import type {
@@ -21,10 +23,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
   practice: typeof practice;
   questionBank: typeof questionBank;
   questionFlags: typeof questionFlags;
   rooms: typeof rooms;
+  security: typeof security;
   snapshot: typeof snapshot;
 }>;
 

@@ -17,7 +17,6 @@ export async function POST(request: Request) {
       config: {
         numberOfRounds: parsed.data.numberOfRounds,
         answerTimeLimitSeconds: parsed.data.answerTimeLimitSeconds,
-        questionMode: parsed.data.questionMode,
         equalBasePoints: parsed.data.equalBasePoints,
         categoryMode: parsed.data.categoryMode,
         enabledCategoryIds: parsed.data.enabledCategoryIds,
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
       },
     });
 
-    await setRoomSessionKey(result.roomCode, result.sessionKey);
+    await setRoomSessionKey(result.roomCode, result.sessionKey, "host");
 
     return Response.json(
       {

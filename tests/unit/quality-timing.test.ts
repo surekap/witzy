@@ -1,8 +1,8 @@
-import { buildQuickQuestions } from "@/lib/questions/quick-bank";
-import { isQuickQuestion, questionQualityIssues, questionWordCount, quickQuestionBudgets } from "@/lib/questions/quality";
+import { buildQuickQuestions } from "@/tests/fixtures/age-banded-questions";
+import { isReviewedQuestion, questionQualityIssues, questionWordCount, questionBudgets } from "@/lib/questions/quality";
 import { shuffleQuestionOptions } from "@/lib/questions/shuffle";
-import { percentile, questionAllowanceSeconds, roundDurationSeconds } from "@/lib/game/timing";
-import { ageBands, type GameConfig } from "@/types/game";
+import { percentile, questionAllowanceSeconds, roundDurationSeconds, roundTimingSamples } from "@/lib/game/timing";
+import { ageBands, type GameConfig, type GameRoom, type GameRound } from "@/types/game";
 import { issuePracticeTicket, publicPracticeQuestion, readPracticeTicket } from "@/lib/practice/ticket";
 import { readToken, signToken } from "@/lib/utils/tokens";
 
@@ -10,7 +10,7 @@ const slugs = ["creative-expression", "design-innovation", "global-perspectives"
 const categories = slugs.map((slug) => ({ id: slug, slug, name: slug, icon: "", active: true }));
 const config: GameConfig = { numberOfRounds: 5, answerTimeLimitSeconds: "auto", categoryMode: "host_selects_each_round", enabledCategoryIds: slugs, fastestCorrectBonus: false, confidenceWager: false, teamBonus: false, hints: true };
 
-describe("quick-play content and timing", () => {
+describe("age-banded content and timing", () => {
   it("has structurally valid concise questions for every production category and age", () => {
     const questions = buildQuickQuestions(categories);
     expect(questions.length).toBeGreaterThan(100);
@@ -20,16 +20,16 @@ describe("quick-play content and timing", () => {
       expect(pool.length).toBeGreaterThanOrEqual(5);
       for (const question of pool) {
         expect(questionQualityIssues(question)).toEqual([]);
-        expect(isQuickQuestion(question)).toBe(true);
-        expect(questionWordCount(question)).toBeLessThanOrEqual(quickQuestionBudgets[age].total);
+        expect(isReviewedQuestion(question)).toBe(true);
+        expect(questionWordCount(question)).toBeLessThanOrEqual(questionBudgets[age].total);
         expect(questionAllowanceSeconds(question, age)).toBeLessThanOrEqual(65);
       }
     }
   });
   it("never treats a short unreviewed legacy question as age-reviewed", () => {
     const question = buildQuickQuestions(categories)[0];
-    expect(isQuickQuestion({ ...question, tags: [] })).toBe(false);
-    expect(isQuickQuestion({ ...question, prompt: "Long ".repeat(80) })).toBe(false);
+    expect(isReviewedQuestion({ ...question, tags: [] })).toBe(false);
+    expect(isReviewedQuestion({ ...question, prompt: "Long ".repeat(80) })).toBe(false);
   });
   it("shuffles without changing the correct answer text or mutating the bank", () => {
     const question = buildQuickQuestions(categories)[0];
@@ -72,5 +72,14 @@ describe("quick-play content and timing", () => {
     expect(readToken(token, "admin")).toBeNull();
     expect(readToken(signToken("ava", "practice", -1), "practice")).toBeNull();
     expect(readToken(`${token}.extra`, "practice")).toBeNull();
+  });
+  it("calibrates only from auto and relaxed rooms, never from fixed host timers", () => {
+    const question = buildQuickQuestions(categories)[0];
+    const round = { status: "locked", startedAt: "2026-10-21T12:00:00.000Z", endsAt: "2026-10-21T12:00:30.000Z", lockedAt: "2026-10-21T12:00:09.000Z",
+      assignments: [{ gamePlayerId: "ava", questionSnapshot: question, assignedDifficulty: question.difficulty, hintUsed: false,
+        answer: { submittedAnswer: "A", isCorrect: true, responseMs: 8000, pointsAwarded: 2, answeredAt: null } }] } as unknown as GameRound;
+    const room = { config, players: [{ id: "ava", ageBand: question.ageBandMin }] } as unknown as GameRoom;
+    expect(roundTimingSamples(room, round)).toEqual([{ ageBand: question.ageBandMin, difficulty: question.difficulty, words: questionWordCount(question), seconds: 8, timedOut: false }]);
+    expect(roundTimingSamples({ ...room, config: { ...config, answerTimeLimitSeconds: 30 } }, round)).toEqual([]);
   });
 });

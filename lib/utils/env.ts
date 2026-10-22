@@ -3,7 +3,6 @@ import { z } from "zod";
 const environmentSchema = z.object({
   NEXT_PUBLIC_CONVEX_URL: z.string().url().optional(),
   CONVEX_ADMIN_KEY: z.string().min(1).optional(),
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   SESSION_SECRET: z.string().min(16).optional(),
   ADMIN_PANEL_PASSWORD: z.string().min(8).optional(),
   MEDIA_BASE_URL: z.string().url().optional(),
@@ -13,7 +12,6 @@ const environmentSchema = z.object({
 const parsedEnvironment = environmentSchema.safeParse({
   NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
   CONVEX_ADMIN_KEY: process.env.CONVEX_ADMIN_KEY,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   SESSION_SECRET: process.env.SESSION_SECRET,
   ADMIN_PANEL_PASSWORD: process.env.ADMIN_PANEL_PASSWORD,
   MEDIA_BASE_URL: process.env.MEDIA_BASE_URL,
@@ -33,11 +31,6 @@ export const env = {
     (parsedEnvironment.data.NODE_ENV === "production"
       ? ""
       : "dev-session-secret-for-local-builds"),
-  NEXT_PUBLIC_APP_URL:
-    parsedEnvironment.data.NEXT_PUBLIC_APP_URL ??
-    (parsedEnvironment.data.NODE_ENV === "production"
-      ? "https://witzy.sureka.family"
-      : "http://localhost:3000"),
 };
 
 export function requireConvexUrl() {

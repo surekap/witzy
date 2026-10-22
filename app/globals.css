@@ -113,6 +113,12 @@ h1, h2, h3, h4 {
   box-shadow: 1px 1px 0 var(--ink);
 }
 
+/* Large button variant: the one obvious thing to tap */
+.btn-lg {
+  padding: 1.125rem 1.75rem;
+  font-size: 1.25rem;
+}
+
 /* ── Card surface ──────────────────────────────────────────── */
 .surface {
   background-color: var(--card);
