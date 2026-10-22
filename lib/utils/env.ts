@@ -46,8 +46,14 @@ export function requireConvexAdminKey() {
   if (!env.CONVEX_ADMIN_KEY) {
     throw new Error("CONVEX_ADMIN_KEY is required for server-side Convex operations.");
   }
+  // Deploy keys look like "prod:<deployment>|<secret>". Describe a mismatch without revealing any of the secret.
+  const key = env.CONVEX_ADMIN_KEY;
+  if (!/^(prod|dev|preview):[\w:-]+\|\S+$/.test(key)) {
+    console.error(`CONVEX_ADMIN_KEY is not a Convex deploy key: length ${key.length}, "|" count ${key.split("|").length - 1}, ` +
+      `whitespace ${/\s/.test(key)}, quoted ${/^["']/.test(key)}, type prefix ${/^(prod|dev|preview):/.exec(key)?.[1] ?? "none"}`);
+  }
 
-  return env.CONVEX_ADMIN_KEY;
+  return key;
 }
 
 export function requireAdminPanelPassword() {
